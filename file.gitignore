@@ -1,0 +1,12 @@
+# Ignore Python virtual environment
+backend/venv/
+
+# Ignore node_modules from React
+frontend/node_modules/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.env
+.env
+.DS_Store
