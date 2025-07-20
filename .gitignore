@@ -4,6 +4,9 @@ backend/venv/
 # Ignore node_modules from React
 frontend/node_modules/
 
+uploads/*
+!uploads/.gitkeep
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
