@@ -1,16 +1,16 @@
-// src/components/FileUpload.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import PromptInput from './PromptInput';
 import FileInput from './FileInput';
 import DisplayBlock from './DisplayBlock';
 import MarkdownResponse from './MarkdownResponse';
+import PdfViewer from './PdfViewer';
+import './FileUpload.css';
 
 function FileUpload() {
   const [file, setFile] = useState(null);
   const [question, setQuestion] = useState('Give a detailed summary of the document.');
   const [status, setStatus] = useState('');
-  const [extractedText, setExtractedText] = useState('');
   const [answer, setAnswer] = useState('');
   const [showLatex, setShowLatex] = useState(false);
 
@@ -22,7 +22,6 @@ function FileUpload() {
     formData.append('question', question);
 
     setStatus('Uploading & processing...');
-    setExtractedText('');
     setAnswer('');
     setShowLatex(false);
 
@@ -32,7 +31,6 @@ function FileUpload() {
       });
 
       setStatus(res.data.message || 'Done');
-      setExtractedText(res.data.text || '');
       setAnswer(res.data.answer || '');
       setShowLatex(true);
     } catch (err) {
@@ -42,19 +40,20 @@ function FileUpload() {
   };
 
   return (
-    <div>
+    <div className="upload-container">
       <FileInput setFile={setFile} />
       <PromptInput question={question} setQuestion={setQuestion} />
       <button onClick={handleUpload}>Upload & Ask</button>
       <p className="status">{status}</p>
 
-      {extractedText && (
-        <DisplayBlock title="Extracted Text" content={extractedText} />
-      )}
-
-      {showLatex && answer && (
-        <MarkdownResponse markdown={answer} />
-      )}
+      <div className="side-by-side">
+        <div className="left-panel">
+          <PdfViewer file={file} />
+        </div>
+        <div className="right-panel">
+          {showLatex && answer && <MarkdownResponse markdown={answer} />}
+        </div>
+      </div>
     </div>
   );
 }

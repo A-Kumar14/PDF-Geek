@@ -1,0 +1,39 @@
+.pdf-viewer {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.controls-container {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.page-controls,
+.zoom-controls,
+.rotation-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pdf-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+canvas {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.placeholder {
+  padding: 2rem;
+  color: #666;
+}
