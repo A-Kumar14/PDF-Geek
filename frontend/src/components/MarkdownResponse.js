@@ -6,7 +6,6 @@ function MarkdownResponse({ markdown }) {
 
   return (
     <section className="text-block">
-      <h2>AI Response</h2>
       <ReactMarkdown>{markdown}</ReactMarkdown>
     </section>
   );
