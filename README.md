@@ -1,32 +1,76 @@
-# AI-PDF-CHATBOT
+# 🧠 PDF Geek
 
-A chatbot for analyzing documents. This project contains a full-stack implementation with AI integration, providing a web interface for uploading PDF documents and obtaining insights through a conversational chat interface.
+A full-stack intelligent chatbot for analyzing PDF documents using AI. Built with REACT and FLASK, it provides a clean web interface where users can upload PDFs, view them live, and chat with the document using OpenAI's language models.
 
-## Directory structure
+---
 
-- `ChatBot-main`: Original proof-of-concept implementation with full AI integration.
-- `backend`: Refactored backend service that handles PDF processing, AI inference, and API endpoints.
-- `frontend`: Refactored frontend built with React, which provides the user interface for uploading documents and chatting.
-- `uploads`: Temporary storage for uploaded PDF files.
+## Directory Structure
 
-## Getting started
+| Directory     | Description                                                                 |
+|---------------|-----------------------------------------------------------------------------|
+| `ChatBot-main`| Original proof-of-concept with basic AI-PDF logic                           |
+| `backend/`    | Flask backend that handles PDF upload, processing with pdfplumber, and GPT calls |
+| `frontend/`   | React-based UI for PDF viewing and chatting                                  |
+| `uploads/`    | Temporary storage for uploaded PDFs                                          |
 
-1. **Clone the repository**:
+---
+
+## Getting Started
+
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/A-Kumar14/AI-PDF-CHATBOT.git
-cd AI-PDF-CHATBOT
+git clone https://github.com/A-Kumar14/PDF-Geek.git
+cd PDF-Geek
+````
+
+### 2. Backend Setup
+
+```bash
+cd backend
+pip install -r requirements.txt
+# Create a .env file with your OpenAI API key
+# Example:
+# OPENAI_API_KEY=your_key_here
+python app.py
 ```
 
-2. **Install dependencies**:
-   - Navigate to the `backend` directory and follow the instructions in its README or documentation.
-   - Navigate to the `frontend` directory and run `npm install`.
+### 3. Frontend Setup
 
-3. **Run the application**:
-   - Start the backend server (e.g., `python app.py` or `npm run server` depending on your setup).
-   - Start the frontend development server (`npm start` in the `frontend` directory).
-   - Open your browser and access the application at `http://localhost:3000` (or the port configured in your setup).
+```bash
+cd ../frontend
+npm install
+npm start
+```
 
-## Contributing
+Open your browser at `http://localhost:3000`.
 
-Contributions are welcome! Feel free to open issues or pull requests for new features, bug fixes, or improvements.
+---
+
+## Key Features
+
+* 📄 **Upload and preview** PDF documents side-by-side
+* 💬 **Chat with your documents** using OpenAI-powered prompt input
+* 📤 Upload by clicking anywhere on the left panel
+* 🎯 Clean split-screen layout: PDF on the left, chat interface on the right
+* 🧼 Markdown-rendered AI responses for a clean reading experience
+
+---
+
+## Prompt Examples
+
+Try these prompts after uploading your PDF:
+
+* `"Summarize the main points of the document"`
+* `"List all clinical trials mentioned"`
+* `"What are the key findings in this report?"`
+* `"Summarize the contact and institutional information"`
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!
+Feel free to submit pull requests or open issues for bugs, ideas, or features.
+
+---
