@@ -11,48 +11,74 @@ function PdfViewer({ file }) {
   const [scale, setScale] = useState(1.0);
   const [rotation, setRotation] = useState(0);
   const canvasRef = useRef(null);
+  const renderTaskRef = useRef(null); // Track current render task
 
-  const renderPage = async (pageNumber) => {
-    if (!pdfDoc) return;
-
-    const page = await pdfDoc.getPage(pageNumber);
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-
-    const viewport = page.getViewport({ scale, rotation });
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-
-    const renderContext = {
-      canvasContext: context,
-      viewport,
-    };
-
-    await page.render(renderContext).promise;
-  };
-
+  // Load PDF whenever file changes
   useEffect(() => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const typedArray = new Uint8Array(e.target.result);
-        try {
-          const loadingTask = pdfjsLib.getDocument(typedArray);
-          const pdf = await loadingTask.promise;
+    const loadPdf = async () => {
+      if (!file) {
+        setPdfDoc(null);
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        return;
+      }
 
+      const fileReader = new FileReader();
+      fileReader.onload = async (e) => {
+        const typedarray = new Uint8Array(e.target.result);
+        try {
+          const loadingTask = pdfjsLib.getDocument(typedarray);
+          const pdf = await loadingTask.promise;
           setPdfDoc(pdf);
           setTotalPages(pdf.numPages);
           setPageNum(1);
-        } catch (error) {
-          console.error('Error loading PDF:', error);
-          alert('Error loading PDF file');
+        } catch (err) {
+          console.error("Error loading PDF", err);
         }
       };
-      reader.readAsArrayBuffer(file);
-    }
+      fileReader.readAsArrayBuffer(file);
+    };
+    loadPdf();
   }, [file]);
 
+  // Render page when dependencies change
   useEffect(() => {
+    const renderPage = async (pageNumber) => {
+      if (!pdfDoc) return;
+
+      const page = await pdfDoc.getPage(pageNumber);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      const viewport = page.getViewport({ scale, rotation });
+
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      // Cancel previous render task if any
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch (e) {
+          console.warn("Render cancel error suppressed:", e.message);
+        }
+      }
+
+      const renderContext = { canvasContext: context, viewport };
+      const renderTask = page.render(renderContext);
+      renderTaskRef.current = renderTask;
+
+      try {
+        await renderTask.promise;
+      } catch (err) {
+        if (err.name !== 'RenderingCancelledException') {
+          console.warn("Suppressed rendering error:", err.message);
+        }
+      }
+    };
+
     if (pdfDoc) {
       renderPage(pageNum);
     }

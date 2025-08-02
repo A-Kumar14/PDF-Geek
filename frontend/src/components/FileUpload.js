@@ -10,7 +10,8 @@ function FileUpload({
   status, 
   answer, 
   showLatex, 
-  hideFileButton 
+  hideFileButton, 
+  loading
 }) {
   return (
     <div>
@@ -37,6 +38,8 @@ function FileUpload({
       <button onClick={handleUpload}>
         Ask
       </button>
+
+      
 
       {showLatex && answer && (
         <div className="text-block">

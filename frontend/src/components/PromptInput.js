@@ -3,7 +3,7 @@ import React from 'react';
 function PromptInput({ question, setQuestion }) {
   return (
     <div className="form-row">
-      <label htmlFor="question">Question / Prompt:</label>
+      <label htmlFor="question">Prompt</label>
       <textarea
         id="question"
         rows={2}

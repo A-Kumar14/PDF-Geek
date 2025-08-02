@@ -3,30 +3,40 @@ from flask_cors import CORS
 from envloader import client
 import text_extractor
 import fileuploader
+import json
 
 app = Flask(__name__)
 CORS(app)
 
-
-def gptanalysis(filepath, question):
+def gptanalysis(filepath, question, chat_history):
     try:
+        # Upload the file to OpenAI
         with open(filepath, "rb") as f:
             file_resp = client.files.create(
                 file=f,
                 purpose="user_data"
             )
 
+        # Format chat history
+        messages = [{"role": "system", "content": "You are a helpful assistant that answers questions based on uploaded PDF documents."}]
+        
+        for entry in chat_history:
+            messages.append({"role": "user", "content": entry["question"]})
+            messages.append({"role": "assistant", "content": entry["answer"]})
+
+        # Add current question
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "input_file", "file_id": file_resp.id},
+                {"type": "input_text", "text": question}
+            ]
+        })
+
+        # Call OpenAI chat endpoint
         response = client.responses.create(
             model="gpt-4.1",
-            input=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_file", "file_id": file_resp.id},
-                        {"type": "input_text", "text": question},
-                    ],
-                }
-            ]
+            input=messages
         )
 
         return response.output_text
@@ -34,7 +44,6 @@ def gptanalysis(filepath, question):
     except Exception as e:
         print("Error during OpenAI processing:", e)
         return None
-
 
 @app.route('/upload', methods=['POST'])
 def upload_pdf():
@@ -47,8 +56,14 @@ def upload_pdf():
         return jsonify({"error": "Failed to extract text"}), 500
 
     question = request.form.get("question", "Give a detailed summary of the document.")
+    chat_history_str = request.form.get("chatHistory", "[]")
+    
+    try:
+        chat_history = json.loads(chat_history_str)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid chat history format"}), 400
 
-    summary = gptanalysis(filepath, question)
+    summary = gptanalysis(filepath, question, chat_history)
     if summary is None:
         return jsonify({"error": "Failed to generate AI response"}), 500
 
@@ -57,7 +72,6 @@ def upload_pdf():
         "text": extracted_text,
         "answer": summary
     }), 200
-
 
 if __name__ == '__main__':
     app.run(debug=True)

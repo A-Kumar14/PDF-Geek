@@ -73,4 +73,8 @@ Try these prompts after uploading your PDF:
 Contributions are welcome!
 Feel free to submit pull requests or open issues for bugs, ideas, or features.
 
+<<<<<<< HEAD
 ---
+=======
+---
+>>>>>>> 85c4241 (Added AI loading spinner next to Ask button and fixed canvas render conflicts)
