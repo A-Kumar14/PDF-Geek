@@ -6,6 +6,7 @@ import fileuploader
 import json
 
 app = Flask(__name__)
+CORS(app, origins=["pdf-geek.vercel.app"])
 CORS(app)
 
 def gptanalysis(filepath, question, chat_history):
