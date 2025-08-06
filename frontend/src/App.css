@@ -430,3 +430,61 @@ button.secondary:hover {
   content: '⚠️';
   color: #dc2626;
 }
+
+.App.light {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.App.dark {
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+/* Optional: override other elements */
+textarea,
+input,
+button {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.App.dark textarea,
+.App.dark input {
+  background-color: #333;
+  color: #f0f0f0;
+}
+
+.App.light textarea,
+.App.light input {
+  background-color: #fff;
+  color: #000;
+}
+
+.markdown-renderer {
+  padding: 1rem;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+
+/* Light mode styles */
+.App.light .markdown-renderer {
+  background-color: #f9f9f9;
+  color: #000000;
+}
+
+/* Dark mode styles */
+.App.dark .markdown-renderer {
+  background-color: #1e1e1e;
+  color: #ffffff;
+}
+
+/* Optional: override text block */
+.App.dark .text-block {
+  background-color: #2b2b2b;
+  color: #ffffff;
+}
+
+.App.light .text-block {
+  background-color: #ffffff;
+  color: #000000;
+}

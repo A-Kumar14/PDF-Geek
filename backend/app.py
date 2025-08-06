@@ -18,8 +18,16 @@ def gptanalysis(filepath, question, chat_history):
             )
 
         # Format chat history
-        messages = [{"role": "system", "content": "You are a helpful assistant that answers questions based on uploaded PDF documents."}]
-        
+        messages = [
+            {
+                "role" : 'system',
+                "content" : (
+                    "You are a helpful assistant that answers **only in the context of clinical trials**. "
+                    "You strictly rely on the contents of the uploaded PDF. If a question is unrelated to clinical trials, "
+                    "reply politely that you can only help with clinical trial-related questions."
+                )
+            }
+        ]        
         for entry in chat_history:
             messages.append({"role": "user", "content": entry["question"]})
             messages.append({"role": "assistant", "content": entry["answer"]})

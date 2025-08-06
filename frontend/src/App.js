@@ -16,6 +16,7 @@ function App() {
   const [chatHistory, setChatHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setloading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   const handleUpload = async () => {
     if (!file) return alert("Please select a file first.");
@@ -56,6 +57,23 @@ function App() {
     }
   };
 
+  const downloadChatHistory = () => {
+    if (chatHistory.length === 0) return;
+
+    const content = chatHistory.map((entry, idx) =>
+      `Q${idx + 1}: ${entry.question}\nA${idx + 1}: ${entry.answer}\n\n`
+    ).join('');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'chat_history.txt';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+
   function MarkdownResponse({ markdown }) {
     return (
       <div className="markdown-renderer">
@@ -67,7 +85,22 @@ function App() {
   }
 
   return (
-    <div className="App">
+    <div className={`App ${darkMode ? 'dark' : 'light'}`}>
+      <div style = {{position : 'absolute' , top : '1rem' , right : '1rem'}}>
+        <button
+          onClick={() => setDarkMode(prev => !prev)}
+          style = {{
+            padding : '0.4rem 0.8rem',
+            borderRadius : '5px',
+            border: 'none',
+            backgroundColor : darkMode ? '#f0f0f0' : '#333',
+            cursor : 'pointer',
+            fontweight : 'bold'
+          }}
+        >
+          {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+      </div>
       <h1>PDFGeek</h1>
       <div className="main-container" style={{ display: 'flex', flexDirection: 'row', gap: '2rem', padding: '1rem' }}>
         <div
@@ -153,6 +186,24 @@ function App() {
               style={{ marginTop: '1rem', padding: '0.5rem', alignSelf: 'start' }}
             >
               {showHistory ? 'Hide Chat History' : 'Show Chat History'}
+            </button>
+          )}
+
+          {chatHistory.length > 0 && (
+            <button
+              onClick = {downloadChatHistory}
+              style = {{
+                marginTop : '0.5rem',
+                padding : '0.5rem',
+                alignSelf : 'start',
+                backgroundColor : '#4CAF50',
+                color : 'white',
+                border: 'none',
+                borderRadius : '5px',
+                cursor : 'pointer'
+              }}
+            >
+              Download Chat History
             </button>
           )}
 
