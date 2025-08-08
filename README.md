@@ -319,12 +319,6 @@ git push heroku main
 
 ---
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🙏 Acknowledgments
 
 - OpenAI for providing the AI capabilities
@@ -333,4 +327,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by the PDFGeek team**
+**Made with ❤️ by the A-Kumar14**
