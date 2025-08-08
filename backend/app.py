@@ -24,17 +24,14 @@ CORS(app, origins=[
     "http://localhost:3001"
 ])
 
-# Initialize services
 ai_service = AIService()
 pdf_service = PDFService()
 rate_limiter = IPRateLimiter()
 
-# Configuration
 UPLOAD_FOLDER = 'uploads'
 MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
-# Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @app.before_request
@@ -43,7 +40,7 @@ def before_request():
     client_ip = request.remote_addr
     logger.info(f"Request from {client_ip}: {request.method} {request.path}")
     
-    # Check rate limit for upload endpoint
+
     if request.path == '/upload':
         is_allowed, remaining = rate_limiter.is_allowed(client_ip)
         if not is_allowed:

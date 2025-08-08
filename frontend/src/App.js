@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import './App.css';
 import PdfViewer from './components/PdfViewer';
-import FileUpload from './components/FileUpload';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import Toast from './components/Toast';
@@ -13,16 +12,15 @@ function App() {
   const [question, setQuestion] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [lightMode, setLightMode] = useState(false); // false = dark by default
+  const darkMode = !lightMode; // computed
   const [toasts, setToasts] = useState([]);
   const [error, setError] = useState(null);
   const [clinicalMode, setClinicalMode] = useState(false);
 
-  // Split sizes (left:right in %)
   const [leftSize, setLeftSize] = useState(50);
   const isResizingRef = useRef(false);
 
-  // ---- Toasts ----
   const addToast = useCallback((message, type = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -32,7 +30,6 @@ function App() {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
 
-  // ---- API Error ----
   const handleApiError = useCallback((error, customMessage = null) => {
     console.error('API Error:', error);
     let message = customMessage || 'An error occurred while processing your request.';
@@ -48,11 +45,9 @@ function App() {
     setError(message);
   }, [addToast]);
 
-  // ---- Regenerate last user prompt ----
   const handleRegenerate = async () => {
     const lastUserMessage = [...chatHistory].reverse().find(msg => msg.role === 'user');
     if (!lastUserMessage) return addToast('No previous message to regenerate', 'warning');
-
     if (!file) return addToast('Upload a PDF to regenerate.', 'warning');
 
     const formData = new FormData();
@@ -76,7 +71,6 @@ function App() {
     }
   };
 
-  // ---- Copy last assistant response ----
   const handleCopy = () => {
     const lastAssistant = [...chatHistory].reverse().find(msg => msg.role === 'assistant');
     if (!lastAssistant) return addToast('No response to copy', 'warning');
@@ -85,11 +79,10 @@ function App() {
       .catch(() => addToast('Failed to copy', 'error'));
   };
 
-  // ---- Download chat history ----
   const downloadChatHistory = () => {
     if (chatHistory.length === 0) return addToast('No chat history to download', 'warning');
     try {
-      const lines = chatHistory.map((entry, idx) => {
+      const lines = chatHistory.map((entry) => {
         const who = entry.role === 'user' ? 'You' : 'PDFGeek';
         const ts = entry.t ? ` [${new Date(entry.t).toLocaleString()}]` : '';
         return `${who}${ts}: ${entry.content}`;
@@ -107,18 +100,16 @@ function App() {
     }
   };
 
-  // ---- Ask new question ----
   const handleUpload = async () => {
     if (!file) return addToast('Please select a file first', 'warning');
     if (!question.trim()) return addToast('Please enter a question', 'warning');
 
-    const payload = question;
     const formData = new FormData();
     formData.append('pdf', file);
-    formData.append('question', payload);
+    formData.append('question', question);
     formData.append('chatHistory', JSON.stringify(chatHistory));
 
-    setChatHistory(prev => [...prev, { role: 'user', content: payload, t: Date.now() }]);
+    setChatHistory(prev => [...prev, { role: 'user', content: question, t: Date.now() }]);
     setLoading(true);
     setQuestion('');
     setError(null);
@@ -137,7 +128,6 @@ function App() {
     }
   };
 
-  // ---- File picker + DnD ----
   const fileInputRef = useRef(null);
   const handleFileClick = (e) => {
     if (e.target === e.currentTarget || e.target.tagName === 'P') fileInputRef.current?.click();
@@ -173,7 +163,6 @@ function App() {
     addToast('PDF uploaded', 'success');
   };
 
-  // ---- Split resize handlers ----
   useEffect(() => {
     const onMove = (e) => {
       if (!isResizingRef.current) return;
@@ -193,7 +182,6 @@ function App() {
     };
   }, []);
 
-  // ---- Keyboard: Enter to send ----
   const inputRef = useRef(null);
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -221,12 +209,10 @@ function App() {
   return (
     <ErrorBoundary>
       <div className={`App ${darkMode ? 'dark' : 'light'}`}>
-        {/* Toasts */}
         {toasts.map(t => (
           <Toast key={t.id} message={t.message} type={t.type} onClose={() => removeToast(t.id)} />
         ))}
 
-        {/* Top Bar */}
         <header className="topbar">
           <div className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <span className="brand-logo">📄</span>
@@ -242,16 +228,15 @@ function App() {
             </button>
             <button
               className="mode-toggle"
-              onClick={() => setDarkMode(prev => !prev)}
-              title={darkMode ? 'Switch to Light' : 'Switch to Dark'}
+              onClick={() => setLightMode(prev => !prev)}
+              title={lightMode ? 'Switch to Dark' : 'Switch to Light'}
             >
-              {darkMode ? '☀️' : '🌙'}
+              {darkMode ? '🌙' : '☀️'}
             </button>
           </div>
         </header>
 
         <div className="main-container">
-          {/* LEFT (PDF) */}
           <div
             className="left-panel dropzone"
             style={{ width: `${leftSize}%` }}
@@ -262,7 +247,6 @@ function App() {
             <input
               ref={fileInputRef}
               type="file"
-              id="hiddenFileInput"
               style={{ display: 'none' }}
               accept="application/pdf"
               onChange={handleFileChange}
@@ -292,7 +276,6 @@ function App() {
             )}
           </div>
 
-          {/* Splitter */}
           <div
             className="splitter"
             onMouseDown={() => { isResizingRef.current = true; document.body.style.userSelect = 'none'; }}
@@ -301,7 +284,6 @@ function App() {
             aria-label="Resize panels"
           />
 
-          {/* RIGHT (Chat) */}
           <div className="right-panel" style={{ width: `${100 - leftSize}%` }}>
             <div className="chat-window">
               {error && (
@@ -342,7 +324,6 @@ function App() {
               )}
             </div>
 
-            {/* Input bar (sticky) */}
             <div className="input-bar">
               <textarea
                 ref={inputRef}
@@ -358,19 +339,6 @@ function App() {
                   {loading ? 'Sending…' : 'Send ➤'}
                 </button>
               </div>
-            </div>
-
-            {/* Hidden FileUpload (kept for compatibility with your existing component) */}
-            <div style={{ display: 'none' }}>
-              <FileUpload
-                file={file}
-                setFile={setFile}
-                question={question}
-                setQuestion={setQuestion}
-                handleUpload={handleUpload}
-                hideFileButton={true}
-                loading={loading}
-              />
             </div>
           </div>
         </div>

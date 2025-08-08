@@ -33,7 +33,7 @@ class AIService:
                     purpose="user_data"
                 )
             
-            # Build messages
+            
             messages = [
                 {
                     "role": 'system',
@@ -47,7 +47,7 @@ class AIService:
                 }
             ]
             
-            # Add chat history
+            
             for entry in chat_history:
                 if entry.get("role") in ["user", "assistant"] and entry.get("content"):
                     messages.append({
@@ -55,7 +55,7 @@ class AIService:
                         "content": entry["content"]
                     })
             
-            # Add current question
+            
             messages.append({
                 "role": "user",
                 "content": [
@@ -84,12 +84,12 @@ class AIService:
             if not os.path.exists(filepath):
                 return False
             
-            # Check file size (max 10MB)
+            #(max 10MB)
             file_size = os.path.getsize(filepath)
             if file_size > 10 * 1024 * 1024:  # 10MB
                 return False
             
-            # Check file extension
+            
             if not filepath.lower().endswith('.pdf'):
                 return False
                 

@@ -205,3 +205,74 @@ textarea, input, button { transition: background-color .2s ease, color .2s ease,
 .App.light textarea, .App.light input { background-color: #fff; color: #000; }
 
 .right-panel .chat-window { background-color: transparent; }
+
+
+.App.light {
+  background-color: #f6f1e1;
+  color: #3b2f2f;
+}
+
+.App.light .left-panel,
+.App.light .right-panel {
+  background-color: #fffaf0;
+  border-color: #d4b483;
+}
+
+.App.light button {
+  background: linear-gradient(135deg, #d62828 0%, #e85d04 100%);
+  color: #fff;
+  border: none;
+}
+
+.App.light .chat-window {
+  background-color: #fffaf0;
+  border-color: #d4b483;
+}
+
+
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+
+.App.dark ::-webkit-scrollbar-thumb {
+  background-color: #444; 
+  border-radius: 8px;
+  border: 2px solid #1e1e1e; 
+}
+
+.App.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #666;
+}
+
+.App.light ::-webkit-scrollbar-thumb {
+  background-color: #c94f4f;
+  border-radius: 8px;
+  border: 2px solid #f4f1e0;
+}
+
+.App.light ::-webkit-scrollbar-thumb:hover {
+  background-color: #a83d3d;
+}
+
+.App.light ::-webkit-scrollbar-track {
+  background-color: #f4f1e0; 
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+.App.dark {
+  scrollbar-color: #444 #1e1e1e;
+}
+
+.App.light {
+  scrollbar-color: #c94f4f #f4f1e0;
+}
+
