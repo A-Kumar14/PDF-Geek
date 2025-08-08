@@ -5,7 +5,6 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok= True)
 
 def uploadfilecheck():
-    #verification
     if 'pdf' not in request.files:
         print("Error, no pdf file detected")
         return jsonify({"ERROR" : "NO PDF FILE DETECTED"}), 400

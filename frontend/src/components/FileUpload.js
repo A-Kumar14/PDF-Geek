@@ -1,20 +1,16 @@
 import React from 'react';
-import MarkdownResponse from './MarkdownResponse';
 
-function FileUpload({ 
-  file, 
-  setFile, 
-  question, 
-  setQuestion, 
-  handleUpload, 
-  status, 
-  answer, 
-  showLatex, 
-  hideFileButton, 
+function FileUpload({
+  file,
+  setFile,
+  question,
+  setQuestion,
+  handleUpload,
+  hideFileButton,
   loading
 }) {
   return (
-    <div>
+    <div style={{ marginTop: '1rem' }}>
       {!hideFileButton && (
         <div className="form-row">
           <label>Upload PDF:</label>
@@ -27,25 +23,36 @@ function FileUpload({
       )}
 
       <div className="form-row">
-        <label>Ask:</label>
         <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Enter your question about the document..."
+          placeholder="Ask something about the document..."
+          rows={3}
+          style={{
+            width: '100%',
+            padding: '0.6rem',
+            borderRadius: '5px',
+            resize: 'vertical',
+            fontSize: '1rem'
+          }}
         />
       </div>
 
-      <button onClick={handleUpload}>
-        Ask
+      <button
+        onClick={handleUpload}
+        style={{
+          marginTop: '0.5rem',
+          padding: '0.5rem 1rem',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer'
+        }}
+        disabled={loading}
+      >
+        {loading ? 'Asking...' : 'Ask'}
       </button>
-
-      
-
-      {showLatex && answer && (
-        <div className="text-block">
-          <MarkdownResponse markdown = {answer}/>
-        </div>
-      )}
     </div>
   );
 }

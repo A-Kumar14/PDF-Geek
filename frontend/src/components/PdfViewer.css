@@ -1,14 +1,16 @@
 .pdf-viewer {
-  padding: 1rem;
+  padding: 0 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  height: 100%;
 }
 
 .controls-container {
   display: flex;
-  gap: 2rem;
-  margin-bottom: 1rem;
+  gap: 1rem;
+  margin: 0.5rem 0 0.75rem;
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -22,18 +24,28 @@
 }
 
 .pdf-container {
+  flex: 1 1 auto;
   width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  overflow: auto;
 }
 
-canvas {
+/* Do not force-size the canvas; JS sets width/height for crisp zoom */
+.pdf-container canvas {
+  display: block;
   border: 1px solid #ccc;
   border-radius: 6px;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  image-rendering: optimizeQuality;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .placeholder {
   padding: 2rem;
   color: #666;
+  text-align: center;
 }

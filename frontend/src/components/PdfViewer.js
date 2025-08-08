@@ -4,16 +4,26 @@ import './PdfViewer.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-function PdfViewer({ file }) {
+function PdfViewer({ file, darkMode }) {
   const [pdfDoc, setPdfDoc] = useState(null);
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   const [rotation, setRotation] = useState(0);
   const canvasRef = useRef(null);
-  const renderTaskRef = useRef(null); // Track current render task
+  const renderTaskRef = useRef(null);
 
-  // Load PDF whenever file changes
+  const miniBtnStyle = {
+    fontSize: '0.75rem',
+    padding: '0.3rem 0.5rem',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    cursor: 'pointer',
+    backgroundColor: darkMode ? '#444' : '#f9f9f9',
+    color: darkMode ? '#fff' : '#000',
+    transition: 'all 0.2s ease-in-out'
+  };
+
   useEffect(() => {
     const loadPdf = async () => {
       if (!file) {
@@ -44,7 +54,6 @@ function PdfViewer({ file }) {
     loadPdf();
   }, [file]);
 
-  // Render page when dependencies change
   useEffect(() => {
     const renderPage = async (pageNumber) => {
       if (!pdfDoc) return;
@@ -57,7 +66,6 @@ function PdfViewer({ file }) {
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      // Cancel previous render task if any
       if (renderTaskRef.current) {
         try {
           renderTaskRef.current.cancel();
@@ -87,27 +95,24 @@ function PdfViewer({ file }) {
   return (
     <div className="pdf-viewer">
       {pdfDoc && (
-        <div className="controls-container">
-          <div className="page-controls">
-            <button onClick={() => setPageNum(p => Math.max(p - 1, 1))} disabled={pageNum <= 1}>
-              Previous
-            </button>
-            <span>Page {pageNum} of {totalPages}</span>
-            <button onClick={() => setPageNum(p => Math.min(p + 1, totalPages))} disabled={pageNum >= totalPages}>
-              Next
-            </button>
-          </div>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '0.8rem'
+        }}>
+          <button style={miniBtnStyle} onClick={() => setPageNum(p => Math.max(p - 1, 1))} disabled={pageNum <= 1}>⬅ Prev</button>
+          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Page {pageNum} of {totalPages}</span>
+          <button style={miniBtnStyle} onClick={() => setPageNum(p => Math.min(p + 1, totalPages))} disabled={pageNum >= totalPages}>Next ➡</button>
 
-          <div className="zoom-controls">
-            <button onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}>Zoom Out</button>
-            <span>{Math.round(scale * 100)}%</span>
-            <button onClick={() => setScale(s => Math.min(s + 0.2, 3))}>Zoom In</button>
-          </div>
+          <button style={miniBtnStyle} onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}>➖ Zoom</button>
+          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>{Math.round(scale * 100)}%</span>
+          <button style={miniBtnStyle} onClick={() => setScale(s => Math.min(s + 0.2, 3))}>➕ Zoom</button>
 
-          <div className="rotation-controls">
-            <button onClick={() => setRotation(r => (r - 90 + 360) % 360)}>Rotate Left</button>
-            <button onClick={() => setRotation(r => (r + 90) % 360)}>Rotate Right</button>
-          </div>
+          <button style={miniBtnStyle} onClick={() => setRotation(r => (r - 90 + 360) % 360)}>⤴ Rot L</button>
+          <button style={miniBtnStyle} onClick={() => setRotation(r => (r + 90) % 360)}>⤵ Rot R</button>
         </div>
       )}
 
