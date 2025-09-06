@@ -1,0 +1,16 @@
+.markdown-renderer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.markdown-renderer th,
+.markdown-renderer td {
+  border: 1px solid #ccc;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdown-renderer th {
+  background-color: #f2f2f2;
+}
