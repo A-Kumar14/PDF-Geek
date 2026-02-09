@@ -2,6 +2,7 @@ import os
 import logging
 from typing import Optional, List
 import pdfplumber
+import PyMuPDF as fitz
 
 # Try to import PyMuPDF with proper error handling
 try:
@@ -24,6 +25,44 @@ class PDFService:
     def __init__(self):
         self.supported_extensions = ['.pdf']
         self.max_file_size = 10 * 1024 * 1024  # 10MB
+
+    def chunking_function(self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
+        if not text:
+            return []
+        
+        try: 
+            chunks = []
+            start = 0
+            text_len = len(text)
+
+            while start < text_len:
+                end = min(start + chunk_size, text_len)
+                if end < text_len:
+                    last_newline = text.rfind("\n", max(start, end - 100), end)
+                    if last_newline != -1:
+                        end = last_newline + 1
+                    else:
+                        last_space = text.rfind(" ", max(start, end - 50), end)
+                        if last_space != -1:
+                            end = last_space + 1
+
+                chunk = text[start:end].strip()
+                if chunk:
+                    chunks.append(chunk)
+
+                # Overlap: next window starts (chunk_overlap) chars before end.
+                # Ensure start always moves forward to avoid infinite loop.
+                next_start = end - chunk_overlap
+                start = max(next_start, start + 1)
+                if start >= text_len:
+                    break
+
+            logger.info(f"Chunked into {len(chunks)} chunks")
+            return chunks
+
+        except Exception as e:
+            logger.error(f"Error chunking text: {str(e)}")
+            return [text]
     
     def extract_text(self, filepath: str) -> Optional[str]:
         """

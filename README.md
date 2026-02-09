@@ -1,79 +1,70 @@
-# 🧠 PDFGeek - AI-Powered PDF Analysis
+# PDFGeek - AI-Powered PDF Assistant
 
-A full-stack intelligent chatbot for analyzing PDF documents using AI. Built with React and Flask, it provides a clean web interface where users can upload PDFs, view them live, and chat with the document using OpenAI's language models.
+A full-stack intelligent chatbot for analyzing PDF documents using AI. Built with React and Flask, PDFGeek provides a clean web interface where users can upload PDFs, view them live, and chat with the document using OpenAI's language models with RAG (Retrieval-Augmented Generation).
 
-## ✨ New Features & Improvements
+## Features
 
-### 🔒 **Security Enhancements**
-- **Input validation** and sanitization to prevent XSS attacks
-- **Rate limiting** to prevent abuse (20 requests per minute)
-- **File validation** with size and type checks
-- **Secure file handling** with automatic cleanup
-- **CORS configuration** for production deployment
+### RAG-Powered Analysis
+- **Smart Chunking**: Documents are split into overlapping chunks for better context retrieval
+- **Vector Embeddings**: Uses OpenAI's `text-embedding-3-small` model for semantic search
+- **ChromaDB Integration**: Vector storage for efficient similarity search
+- **Source Citations**: Responses include references to the source text
 
-### 🚀 **Performance Improvements**
-- **Service layer architecture** for better code organization
-- **Multiple PDF extraction methods** (pdfplumber + PyMuPDF)
-- **Error handling** with proper logging
-- **Health check endpoint** for monitoring
-- **Docker containerization** for easy deployment
+### User Experience
+- **Quick Actions**: One-click buttons for "Summarize", "Key Takeaways", and "Simplify Language"
+- **Skeleton Loading**: Pulsing skeleton loader provides visual feedback during AI processing
+- **Auto-Scroll**: Chat automatically scrolls to show new messages
+- **Dark/Light Mode**: Toggle between themes for comfortable viewing
+- **Drag & Drop**: Simply drag PDF files onto the interface to upload
+- **Collapsible Panels**: Resize or collapse the PDF viewer and chat panels
 
-### 🎨 **User Experience**
-- **Toast notifications** for user feedback
-- **Loading spinners** with better visual feedback
-- **Error boundaries** for graceful error handling
-- **Dark mode** support
-- **Responsive design** for mobile devices
-- **File validation** with helpful error messages
+### Security
+- **Input Validation**: File type, size, and content validation
+- **Rate Limiting**: 20 requests per minute per IP
+- **Secure File Handling**: Files are processed and deleted immediately
+- **Environment Variables**: API keys stored securely in environment
 
-### 🔧 **Developer Experience**
-- **Modular architecture** with separate services
-- **Configuration management** with environment variables
-- **Comprehensive logging** for debugging
-- **Docker support** for consistent environments
-- **Health monitoring** endpoints
+### Developer Features
+- **Modular Architecture**: Clean separation between services
+- **Docker Support**: Easy deployment with Docker Compose
+- **Health Monitoring**: `/health` endpoint for service monitoring
+- **Comprehensive Logging**: Structured logs for debugging
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 PDFGeek/
 ├── backend/
-│   ├── services/          # Business logic layer
-│   │   ├── ai_service.py  # OpenAI integration
-│   │   └── pdf_service.py # PDF processing
-│   ├── utils/             # Utility functions
-│   │   ├── validators.py  # Input validation
-│   │   └── rate_limiter.py # Rate limiting
-│   ├── config.py          # Configuration management
-│   └── app.py            # Flask application
+│   ├── services/
+│   │   ├── ai_service.py     # OpenAI integration + embeddings
+│   │   └── pdf_service.py    # PDF extraction + chunking
+│   ├── config.py             # Configuration management
+│   └── app.py                # Flask app with RAG pipeline
 ├── frontend/
 │   ├── src/
-│   │   ├── components/    # React components
-│   │   │   ├── ErrorBoundary.js
-│   │   │   ├── LoadingSpinner.js
-│   │   │   └── Toast.js
-│   │   └── App.js        # Main application
+│   │   ├── components/       # React components
+│   │   └── App.js            # Main application
 │   └── public/
-└── docker-compose.yml     # Container orchestration
+├── requirements.txt          # Python dependencies
+└── docker-compose.yml        # Container orchestration
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option 1: Docker (Recommended)
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/PDFGeek.git
-   cd PDFGeek
+   git clone https://github.com/A-Kumar14/PDF-Geek.git
+   cd PDF-Geek
    ```
 
 2. **Set up environment variables**
    ```bash
-   # Create .env file
    echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
    ```
 
@@ -85,67 +76,42 @@ PDFGeek/
 4. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
-   - Health Check: http://localhost:5000/health
 
 ### Option 2: Manual Setup
 
 #### Backend Setup
 
-1. **Navigate to backend directory**
-   ```bash
-   cd backend
-   ```
+```bash
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Set environment variable
+export OPENAI_API_KEY=your_openai_api_key_here
 
-4. **Set environment variables**
-   ```bash
-   # Create .env file in backend directory
-   echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
-   ```
-
-5. **Run the backend**
-   ```bash
-   python app.py
-   ```
+# Run the backend
+cd backend
+python app.py
+```
 
 #### Frontend Setup
 
-1. **Navigate to frontend directory**
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server**
-   ```bash
-   npm start
-   ```
-
-4. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
+```bash
+cd frontend
+npm install
+npm start
+```
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
-Create a `.env` file in the backend directory:
+Create a `.env` file in the root or backend directory:
 
 ```env
 # Required
@@ -156,8 +122,6 @@ FLASK_DEBUG=False
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000
 LOG_LEVEL=INFO
-RATE_LIMIT_REQUESTS=20
-RATE_LIMIT_WINDOW=60
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_MAX_TOKENS=1000
 ```
@@ -167,141 +131,85 @@ OPENAI_MAX_TOKENS=1000
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check endpoint |
-| `/upload` | POST | Upload and analyze PDF |
+| `/upload` | POST | Upload PDF and ask questions |
 
-### Request Format
+### Response Format
 
 ```json
 {
-  "pdf": "file",
-  "question": "What is this document about?",
-  "chatHistory": [
-    {"role": "user", "content": "Previous question"},
-    {"role": "assistant", "content": "Previous answer"}
+  "message": "Document processed successfully",
+  "text": "Extracted document text...",
+  "answer": "AI-generated response...",
+  "file_info": {
+    "filename": "document.pdf",
+    "size_mb": 1.5,
+    "page_count": 10
+  },
+  "sources": [
+    {"index": 1, "excerpt": "Relevant text from document..."},
+    {"index": 2, "excerpt": "Another relevant section..."}
   ]
 }
 ```
 
 ---
 
-## 🛠️ Development
+## How It Works
+
+1. **Upload**: User uploads a PDF document
+2. **Extract**: Text is extracted using pdfplumber/PyMuPDF
+3. **Chunk**: Document is split into overlapping chunks (1000 chars, 200 overlap)
+4. **Embed**: Chunks are converted to vectors using OpenAI embeddings
+5. **Store**: Vectors are stored in ChromaDB
+6. **Query**: User's question is embedded and similar chunks are retrieved
+7. **Answer**: Top 5 relevant chunks are sent to GPT-4o-mini for response generation
+8. **Cite**: Response includes source citations from the document
+
+---
+
+## Development
 
 ### Running Tests
 
 ```bash
-# Backend tests
 cd backend
 python -m pytest
-
-# Frontend tests
-cd frontend
-npm test
 ```
 
-### Code Quality
+### Dependencies
 
-```bash
-# Backend linting
-cd backend
-python -m flake8 .
+**Backend (Python)**
+- Flask 3.1.1
+- OpenAI >= 1.0.0
+- ChromaDB >= 0.4.0
+- pdfplumber, PyMuPDF
 
-# Frontend linting
-cd frontend
-npm run lint
-```
-
-### Building for Production
-
-```bash
-# Frontend build
-cd frontend
-npm run build
-
-# Docker build
-docker-compose -f docker-compose.prod.yml up --build
-```
+**Frontend (Node.js)**
+- React
+- react-markdown
+- rehype-highlight
 
 ---
 
-## 📊 Monitoring & Logging
-
-### Health Check
-- Endpoint: `GET /health`
-- Returns application status and version
-
-### Logging
-- Structured logging with timestamps
-- Different log levels (INFO, WARNING, ERROR)
-- Request/response logging
-
-### Error Handling
-- Graceful error handling with user-friendly messages
-- Rate limit exceeded notifications
-- File validation errors
-- API error responses
-
----
-
-## 🔒 Security Features
-
-### Input Validation
-- File type validation (PDF only)
-- File size limits (10MB max)
-- Question length limits (1000 characters)
-- XSS prevention with input sanitization
-
-### Rate Limiting
-- 20 requests per minute per IP
-- Configurable limits via environment variables
-- Automatic cleanup of old requests
-
-### File Security
-- Secure filename handling
-- Automatic file cleanup after processing
-- Temporary file storage with timestamps
-
----
-
-## 🚀 Deployment
+## Deployment
 
 ### Docker Deployment
 
-1. **Production build**
-   ```bash
-   docker-compose -f docker-compose.prod.yml up --build
-   ```
-
-2. **Environment variables**
-   ```bash
-   # Set production environment variables
-   export OPENAI_API_KEY=your_production_key
-   export FLASK_ENV=production
-   export SECRET_KEY=your_secret_key
-   ```
-
-### Cloud Deployment
-
-#### Heroku
 ```bash
-# Create Heroku app
-heroku create your-pdfgeek-app
-
-# Set environment variables
-heroku config:set OPENAI_API_KEY=your_key
-heroku config:set FLASK_ENV=production
-
-# Deploy
-git push heroku main
+docker-compose up --build -d
 ```
 
-#### AWS/GCP/Azure
-- Use the provided Dockerfile
-- Set up environment variables
-- Configure load balancer and SSL
+### Production Considerations
+
+- Set `FLASK_DEBUG=False`
+- Use a proper secret key
+- Configure CORS for your domain
+- Set up SSL/TLS
+- Use a production WSGI server (gunicorn)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -309,22 +217,12 @@ git push heroku main
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Development Guidelines
+---
 
-- Follow PEP 8 for Python code
-- Use ESLint for JavaScript/React code
-- Write tests for new features
-- Update documentation for API changes
-- Use conventional commit messages
+## License
+
+MIT License - see LICENSE file for details.
 
 ---
 
-## 🙏 Acknowledgments
-
-- OpenAI for providing the AI capabilities
-- Flask and React communities for excellent documentation
-- Contributors and users for feedback and suggestions
-
----
-
-**Made with ❤️ by the A-Kumar14**
+**Made by A-Kumar14**

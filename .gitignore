@@ -4,8 +4,6 @@ __pycache__/
 *.pyo
 *.pyd
 *.db
-*.py[cod]
-*$py.class
 
 # Virtual environment
 .venv/
@@ -14,8 +12,6 @@ venv/
 
 # Node
 node_modules/
-build/
-dist/
 
 # Logs
 *.log
@@ -25,4 +21,6 @@ dist/
 
 # Secrets
 .env
-uploads/
+
+# ChromaDB
+**/chroma_data/

@@ -13,7 +13,7 @@ class AIService:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY environment variable is required")
-    
+
     def analyze_document(self, filepath: str, question: str, chat_history: List[Dict]) -> Optional[str]:
         """
         Analyze a PDF document using OpenAI's API with proper error handling
@@ -22,7 +22,7 @@ class AIService:
             if not os.path.exists(filepath):
                 logger.error(f"File not found: {filepath}")
                 return None
-            
+
             if not question.strip():
                 logger.error("Empty question provided")
                 return None
@@ -32,8 +32,7 @@ class AIService:
                     file=f,
                     purpose="user_data"
                 )
-            
-            
+
             messages = [
                 {
                     "role": 'system',
@@ -46,16 +45,14 @@ class AIService:
                     )
                 }
             ]
-            
-            
+
             for entry in chat_history:
                 if entry.get("role") in ["user", "assistant"] and entry.get("content"):
                     messages.append({
-                        "role": entry["role"], 
+                        "role": entry["role"],
                         "content": entry["content"]
                     })
-            
-            
+
             messages.append({
                 "role": "user",
                 "content": [
@@ -65,17 +62,86 @@ class AIService:
             })
 
             response = self.client.responses.create(
-                model="gpt-4o-mini",  
+                model="gpt-4o-mini",
                 input=messages
             )
-            
+
             logger.info(f"Successfully processed question: {question[:50]}...")
             return response.output_text
-            
+
         except Exception as e:
             logger.error(f"Error during AI analysis: {str(e)}")
             return None
-    
+
+    def answer_from_context(
+        self,
+        context_chunks: List[str],
+        question: str,
+        chat_history: List[Dict],
+    ) -> Optional[str]:
+        """
+        Answer the question using only the provided context chunks (no file upload).
+        Used for RAG: relevant chunks are retrieved from ChromaDB and passed here.
+        """
+        try:
+            if not question.strip():
+                logger.error("Empty question provided")
+                return None
+
+            context = "\n\n---\n\n".join(context_chunks) if context_chunks else ""
+
+            system_content = (
+                "You are a helpful AI assistant that answers questions about PDF documents. "
+                "Your primary goal is to help users understand and extract information from their documents.\n\n"
+                "Guidelines:\n"
+                "- Start with a brief summary when appropriate\n"
+                "- Use a professional but friendly tone\n"
+                "- Format all responses using Markdown (headers, lists, bold, etc.)\n"
+                "- If information is not in the context, say so clearly\n"
+                "- Be concise but thorough\n"
+                "- Highlight key points and takeaways"
+            )
+
+            messages = [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": f"Context from the document:\n\n{context}\n\n---\n\nQuestion: {question}"},
+            ]
+
+            if chat_history:
+                history_messages = []
+                for entry in chat_history:
+                    if entry.get("role") in ("user", "assistant") and entry.get("content"):
+                        history_messages.append(
+                            {"role": entry["role"], "content": entry["content"]}
+                        )
+                messages = [messages[0]] + history_messages + [messages[1]]
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+            )
+            answer = response.choices[0].message.content
+            logger.info(f"Answered from context ({len(context_chunks)} chunks)")
+            return answer
+
+        except Exception as e:
+            logger.error(f"Error in answer_from_context: {str(e)}")
+            return None
+
+    def get_embeddings(self, text_list: List[str]) -> List[List[float]]:
+        """
+        Generate embedding vectors for text chunks using OpenAI's text-embedding-3-small model.
+        Returns list of embedding vectors, one per item in text_list.
+        """
+        if not text_list:
+            return []
+        response = self.client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text_list,
+            encoding_format="float",
+        )
+        return [item.embedding for item in response.data]
+
     def validate_file(self, filepath: str) -> bool:
         """
         Validate uploaded file
@@ -83,18 +149,18 @@ class AIService:
         try:
             if not os.path.exists(filepath):
                 return False
-            
-            #(max 10MB)
+
+            # Check file size (max 10MB)
             file_size = os.path.getsize(filepath)
-            if file_size > 10 * 1024 * 1024:  # 10MB
+            if file_size > 10 * 1024 * 1024:
                 return False
-            
-            
+
+            # Check file extension
             if not filepath.lower().endswith('.pdf'):
                 return False
-                
+
             return True
-            
+
         except Exception as e:
             logger.error(f"File validation error: {str(e)}")
             return False
