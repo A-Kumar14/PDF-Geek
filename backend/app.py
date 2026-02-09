@@ -3,12 +3,17 @@ import json
 import logging
 from datetime import datetime
 
+import chromadb
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
 from services.ai_service import AIService
 from services.pdf_service import PDFService
+
+# ChromaDB persistence path (under backend directory)
+CHROMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_data")
+NUM_RETRIEVAL_CHUNKS = 5
 
 # ---------------------------------------------------------
 # Logging configuration
@@ -132,6 +137,14 @@ ai_service = AIService()
 pdf_service = PDFService()
 rate_limiter = IPRateLimiter()
 
+# ChromaDB client and collection for RAG
+os.makedirs(CHROMA_PATH, exist_ok=True)
+_chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
+chroma_collection = _chroma_client.get_or_create_collection(
+    name="pdf_chunks",
+    metadata={"description": "PDF text chunks for RAG"},
+)
+
 UPLOAD_FOLDER = "uploads"
 MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
@@ -244,9 +257,48 @@ def upload_pdf():
         if not is_valid:
             return jsonify({"error": error_msg}), 400
 
-        # 7) AI analysis
-        logger.info(f"Starting AI analysis for question: {question[:50]}...")
-        ai_response = ai_service.analyze_document(filepath, question, chat_history)
+        # 7) RAG: Chunk -> Embed & Store -> Retrieve -> Augment
+        document_id = safe_filename
+        chunks = pdf_service.chunking_function(extracted_text)
+
+        if chunks:
+            # Embed chunks and store in ChromaDB
+            chunk_embeddings = ai_service.get_embeddings(chunks)
+            chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
+            chroma_collection.add(
+                ids=chunk_ids,
+                embeddings=chunk_embeddings,
+                documents=chunks,
+                metadatas=[{"document_id": document_id} for _ in chunks],
+            )
+            logger.info(f"Stored {len(chunks)} chunks in ChromaDB for {document_id}")
+
+        # Retrieve 3–5 most relevant chunks for the question
+        try:
+            question_embedding = ai_service.get_embeddings([question])[0]
+            results = chroma_collection.query(
+                query_embeddings=[question_embedding],
+                n_results=min(NUM_RETRIEVAL_CHUNKS, max(1, len(chunks))),
+                where={"document_id": document_id},
+            )
+            # results["documents"] is list of lists: one list per query
+            relevant_chunks = results["documents"][0] if results["documents"] else []
+        except Exception as e:
+            logger.warning(f"ChromaDB query failed: {e}, using no context")
+            relevant_chunks = []
+
+        # Remove this document's chunks from ChromaDB (avoid accumulation)
+        if chunks:
+            try:
+                chroma_collection.delete(where={"document_id": document_id})
+            except Exception as e:
+                logger.warning(f"ChromaDB delete failed: {e}")
+
+        # Augment: answer using only retrieved chunks
+        logger.info(f"Answering from {len(relevant_chunks)} relevant chunks")
+        ai_response = ai_service.answer_from_context(
+            relevant_chunks, question, chat_history
+        )
 
         if not ai_response:
             logger.error("AI analysis failed")
@@ -259,12 +311,18 @@ def upload_pdf():
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to clean up file {filepath}: {str(e)}")
 
-        # 9) Build response
+        # 9) Build response (include RAG sources for citations)
+        sources = []
+        for i, chunk_text in enumerate(relevant_chunks, start=1):
+            excerpt = (chunk_text[:200] + "…") if len(chunk_text) > 200 else chunk_text
+            sources.append({"index": i, "excerpt": excerpt.strip()})
+
         response_data = {
             "message": "Document processed successfully",
             "text": extracted_text,
             "answer": ai_response,
             "file_info": file_info,
+            "sources": sources,
         }
 
         logger.info("Request processed successfully")
