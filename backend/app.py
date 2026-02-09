@@ -3,7 +3,10 @@ import json
 import logging
 from datetime import datetime
 
-import chromadb
+from dotenv import load_dotenv
+load_dotenv()
+
+import chromadb  # pyright: ignore[reportMissingImports]
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -27,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------
 # Simple in-file validation and rate limiting
+# (replaces old utils.validators and utils.rate_limiter imports)
 # ---------------------------------------------------------
 class InputValidator:
     """Minimal input validation helpers for upload endpoint."""
@@ -56,6 +60,7 @@ class InputValidator:
 
     @staticmethod
     def sanitize_input(text: str) -> str:
+        # Simple sanitization; extend later if needed
         return text.strip()
 
     @classmethod
@@ -77,11 +82,12 @@ class InputValidator:
 
 
 class IPRateLimiter:
-    """Simple in-memory per-IP rate limiter."""
+    """Very simple in-memory per-IP rate limiter."""
 
     def __init__(self, max_requests: int = 20, window_seconds: int = 60):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
+        # {ip: [timestamps]}
         self._hits = {}
 
     def _prune(self, ip: str, now: float):
@@ -96,6 +102,7 @@ class IPRateLimiter:
         self._prune(ip, now)
         timestamps = self._hits.get(ip, [])
         if len(timestamps) >= self.max_requests:
+            # Not allowed; how many remaining in window is 0
             return False, 0
         timestamps.append(now)
         self._hits[ip] = timestamps
@@ -123,7 +130,6 @@ CORS(
     app,
     origins=[
         "http://localhost:3000",
-        "http://localhost:3001",
         "https://localhost:3000",
         "https://*.vercel.app",
         "https://pdf-geek.vercel.app",
@@ -155,6 +161,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.before_request
 def before_request():
     """Log all requests and check rate limits for /upload."""
+
     client_ip = request.remote_addr or "unknown"
     logger.info(f"Request from {client_ip}: {request.method} {request.path}")
 
@@ -180,6 +187,7 @@ def before_request():
 @app.route("/health", methods=["GET"])
 def health_check():
     """Health check endpoint."""
+
     return (
         jsonify(
             {
@@ -194,15 +202,8 @@ def health_check():
 
 @app.route("/upload", methods=["POST"])
 def upload_pdf():
-    """
-    Handle PDF upload with RAG pipeline:
-    1. Save and validate file
-    2. Extract text from PDF
-    3. Chunk text into segments
-    4. Generate embeddings and store in ChromaDB
-    5. Retrieve relevant chunks for question
-    6. Generate answer using context
-    """
+    """Handle PDF upload and analysis."""
+
     try:
         # 1) Basic file presence check
         if "pdf" not in request.files:
@@ -226,7 +227,7 @@ def upload_pdf():
         try:
             file.save(filepath)
             logger.info(f"File saved: {filepath}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error saving file: {str(e)}")
             return jsonify({"error": "Failed to save file"}), 500
 
@@ -275,7 +276,7 @@ def upload_pdf():
             )
             logger.info(f"Stored {len(chunks)} chunks in ChromaDB for {document_id}")
 
-        # Retrieve relevant chunks for the question
+        # Retrieve 3–5 most relevant chunks for the question
         try:
             question_embedding = ai_service.get_embeddings([question])[0]
             results = chroma_collection.query(
@@ -283,6 +284,7 @@ def upload_pdf():
                 n_results=min(NUM_RETRIEVAL_CHUNKS, max(1, len(chunks))),
                 where={"document_id": document_id},
             )
+            # results["documents"] is list of lists: one list per query
             relevant_chunks = results["documents"][0] if results["documents"] else []
         except Exception as e:
             logger.warning(f"ChromaDB query failed: {e}, using no context")
@@ -309,13 +311,13 @@ def upload_pdf():
         try:
             os.remove(filepath)
             logger.info(f"Cleaned up file: {filepath}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to clean up file {filepath}: {str(e)}")
 
         # 9) Build response (include RAG sources for citations)
         sources = []
         for i, chunk_text in enumerate(relevant_chunks, start=1):
-            excerpt = (chunk_text[:200] + "...") if len(chunk_text) > 200 else chunk_text
+            excerpt = (chunk_text[:200] + "…") if len(chunk_text) > 200 else chunk_text
             sources.append({"index": i, "excerpt": excerpt.strip()})
 
         response_data = {
@@ -329,7 +331,7 @@ def upload_pdf():
         logger.info("Request processed successfully")
         return jsonify(response_data), 200
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Unexpected error in upload endpoint: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
@@ -338,20 +340,23 @@ def upload_pdf():
 # Error handlers
 # ---------------------------------------------------------
 @app.errorhandler(413)
-def too_large(e):
+def too_large(e):  # noqa: D401, ANN001
     """Handle file too large error."""
+
     return jsonify({"error": "File too large (max 10MB)"}), 413
 
 
 @app.errorhandler(404)
-def not_found(e):
+def not_found(e):  # noqa: D401, ANN001
     """Handle 404 errors."""
+
     return jsonify({"error": "Endpoint not found"}), 404
 
 
 @app.errorhandler(500)
-def internal_error(e):
+def internal_error(e):  # noqa: D401, ANN001
     """Handle internal server errors."""
+
     logger.error(f"Internal server error: {str(e)}")
     return jsonify({"error": "Internal server error"}), 500
 

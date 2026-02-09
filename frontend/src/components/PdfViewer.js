@@ -42,7 +42,7 @@ function PdfViewer({ file, darkMode }) {
           setRotation(0);
           setThumbnails([]);
         } catch (err) {
-          console.error("Error loading PDF", err);
+          console.error('Error loading PDF', err);
         }
       };
       fileReader.readAsArrayBuffer(file);
@@ -90,7 +90,7 @@ function PdfViewer({ file, darkMode }) {
         try {
           renderTaskRef.current.cancel();
         } catch (e) {
-          console.warn("Render cancel error suppressed:", e.message);
+          console.warn('Render cancel error suppressed:', e.message);
         }
       }
 
@@ -102,7 +102,7 @@ function PdfViewer({ file, darkMode }) {
         await renderTask.promise;
       } catch (err) {
         if (err.name !== 'RenderingCancelledException') {
-          console.warn("Suppressed rendering error:", err.message);
+          console.warn('Suppressed rendering error:', err.message);
         }
       }
     };

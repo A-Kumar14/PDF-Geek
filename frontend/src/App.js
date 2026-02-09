@@ -1,587 +1,75 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import './App.css';
-import PdfViewer from './components/PdfViewer';
-import ErrorBoundary from './components/ErrorBoundary';
-import Toast from './components/Toast';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import 'highlight.js/styles/github.min.css';
-
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
-
-const UPLOAD_PHASES = ['idle', 'extracting', 'embedding', 'answering'];
-
-// Quick action prompts for common tasks
-const QUICK_ACTIONS = [
-  { label: 'Summarize', prompt: 'Please provide a comprehensive summary of this document.' },
-  { label: 'Key Takeaways', prompt: 'What are the key takeaways and main points from this document?' },
-  { label: 'Simplify', prompt: 'Please explain the main concepts in this document in simple, easy-to-understand language.' },
-];
 
 function App() {
   const [file, setFile] = useState(null);
-  const [question, setQuestion] = useState('');
-  const [chatHistory, setChatHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [uploadPhase, setUploadPhase] = useState('idle');
-  const [lightMode, setLightMode] = useState(false);
-  const darkMode = !lightMode;
-  const [toasts, setToasts] = useState([]);
-  const [error, setError] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [collapseLeft, setCollapseLeft] = useState(false);
-  const [collapseRight, setCollapseRight] = useState(false);
+  const [question, setQuestion] = useState('Give a detailed summary of the document.');
+  const [status, setStatus] = useState('');
+  const [extractedText, setExtractedText] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [showLatex, setShowLatex] = useState(false);
 
-  const [leftSize, setLeftSize] = useState(50);
-  const isResizingRef = useRef(false);
-  const chatWindowRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const progressIntervalRef = useRef(null);
+  const handleFileChange = (e) => setFile(e.target.files[0]);
+  const handleQuestionChange = (e) => setQuestion(e.target.value);
 
-  const addToast = useCallback((message, type = 'info') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
-
-  const removeToast = useCallback((id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
-
-  const handleApiError = useCallback((error, customMessage = null) => {
-    console.error('API Error:', error);
-    let message = customMessage || 'An error occurred while processing your request.';
-    if (error.response) {
-      const { status, data } = error.response;
-      if (status === 429) message = 'Rate limit exceeded. Please wait a moment before trying again.';
-      else if (status === 413) message = 'File too large. Please upload a file smaller than 10MB.';
-      else if (data && data.error) message = data.error;
-    } else if (error.message) {
-      message = error.message;
-    }
-    addToast(message, 'error');
-    setError(message);
-  }, [addToast]);
-
-  const handleCopyFor = useCallback((content) => {
-    if (!content) return addToast('Nothing to copy', 'warning');
-    navigator.clipboard.writeText(content)
-      .then(() => addToast('Copied to clipboard', 'success'))
-      .catch(() => addToast('Failed to copy', 'error'));
-  }, [addToast]);
-
-  const handleRegenerateFor = useCallback(async (userMessageIndex) => {
-    const userMsg = chatHistory[userMessageIndex];
-    if (!userMsg || userMsg.role !== 'user' || !file) return addToast('Cannot regenerate', 'warning');
-    const formData = new FormData();
-    formData.append('pdf', file);
-    formData.append('question', userMsg.content);
-    formData.append('chatHistory', JSON.stringify(chatHistory.slice(0, userMessageIndex)));
-    setLoading(true);
-    setError(null);
-    setUploadPhase('extracting');
-    progressIntervalRef.current = setInterval(() => {
-      setUploadPhase(p => {
-        const i = UPLOAD_PHASES.indexOf(p);
-        if (i < 0 || i >= UPLOAD_PHASES.length - 1) return p;
-        return UPLOAD_PHASES[i + 1];
-      });
-    }, 800);
-    try {
-      const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
-      clearInterval(progressIntervalRef.current);
-      setUploadPhase('idle');
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const data = await res.json();
-      const aiResponse = data.answer || "Sorry, no response generated.";
-      const sources = Array.isArray(data.sources) ? data.sources : [];
-      const newEntry = { role: 'assistant', content: aiResponse, citations: sources, t: Date.now() };
-      setChatHistory(prev => {
-        const next = [...prev];
-        const replaceFrom = userMessageIndex + 1;
-        const afterAssistant = next.findIndex((m, i) => i >= replaceFrom && m.role === 'assistant');
-        const end = afterAssistant >= 0 ? afterAssistant : next.length;
-        next.splice(replaceFrom, end - replaceFrom, newEntry);
-        return next;
-      });
-      addToast('Response regenerated', 'success');
-    } catch (err) {
-      clearInterval(progressIntervalRef.current);
-      setUploadPhase('idle');
-      handleApiError(err, 'Failed to regenerate response');
-    } finally {
-      setLoading(false);
-    }
-  }, [chatHistory, file, addToast, handleApiError]);
-
-  const downloadChatHistory = () => {
-    if (chatHistory.length === 0) return addToast('No chat history to download', 'warning');
-    try {
-      const lines = chatHistory.map((entry) => {
-        const who = entry.role === 'user' ? 'You' : 'PDFGeek';
-        const ts = entry.t ? ` [${new Date(entry.t).toLocaleString()}]` : '';
-        let text = `${who}${ts}: ${entry.content}`;
-        if (entry.role === 'assistant' && entry.citations?.length) {
-          text += '\n  [Sources: ' + entry.citations.map(s => {
-            const ex = (s.excerpt || '').slice(0, 80);
-            return `Source ${s.index}: ${ex}${(s.excerpt || '').length > 80 ? '...' : ''}`;
-          }).join('; ') + ']';
-        }
-        return text;
-      }).join('\n\n');
-      const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'chat_history.txt';
-      link.click();
-      URL.revokeObjectURL(url);
-      addToast('Chat history downloaded', 'success');
-    } catch {
-      addToast('Failed to download chat history', 'error');
-    }
-  };
-
-  const handleUpload = async (questionText = null) => {
-    const q = questionText || question;
-    if (!file) return addToast('Please select a file first', 'warning');
-    if (!q.trim()) return addToast('Please enter a question', 'warning');
+  const handleUpload = async () => {
+    if (!file) return alert("Please select a file first.");
 
     const formData = new FormData();
     formData.append('pdf', file);
-    formData.append('question', q);
-    formData.append('chatHistory', JSON.stringify(chatHistory));
+    formData.append('question', question);
 
-    setChatHistory(prev => [...prev, { role: 'user', content: q, t: Date.now() }]);
-    setLoading(true);
-    setQuestion('');
-    setError(null);
-    setUploadPhase('extracting');
-    progressIntervalRef.current = setInterval(() => {
-      setUploadPhase(p => {
-        const i = UPLOAD_PHASES.indexOf(p);
-        if (i < 0 || i >= UPLOAD_PHASES.length - 1) return p;
-        return UPLOAD_PHASES[i + 1];
-      });
-    }, 800);
+    setStatus('Uploading & processing...');
+    setExtractedText(''); setAnswer('');
 
     try {
-      const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
-      clearInterval(progressIntervalRef.current);
-      setUploadPhase('idle');
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const data = await res.json();
-      const aiResponse = data.answer || "Sorry, no response generated.";
-      const sources = Array.isArray(data.sources) ? data.sources : [];
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: aiResponse,
-        citations: sources,
-        t: Date.now(),
-      }]);
-      addToast('Question processed', 'success');
+      const res = await axios.post('http://localhost:5000/upload', formData, {
+        headers: {'Content-Type': 'multipart/form-data'},
+      });
+
+      setStatus(res.data.message || 'Done');
+      setExtractedText(res.data.text || '');
+      setAnswer(res.data.answer || '');
+      setShowLatex(true);
     } catch (err) {
-      clearInterval(progressIntervalRef.current);
-      setUploadPhase('idle');
-      handleApiError(err, 'Failed to process question');
-    } finally {
-      setLoading(false);
+      console.error(err);
+      setStatus('Processing failed.');
+      setShowLatex(false);
     }
-  };
-
-  const handleQuickAction = (prompt) => {
-    if (!file) return addToast('Please upload a PDF first', 'warning');
-    if (loading) return;
-    handleUpload(prompt);
-  };
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    if (!selectedFile.type.includes('pdf')) return addToast('Please select a PDF file', 'error');
-    if (selectedFile.size > 10 * 1024 * 1024) return addToast('File too large (max 10MB)', 'error');
-    setFile(selectedFile);
-    setChatHistory([]);
-    setError(null);
-    addToast('PDF uploaded', 'success');
-  };
-
-  const handleDragEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files')) setDragOver(true);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-    const dropped = e.dataTransfer.files?.[0];
-    if (!dropped) return;
-    if (!dropped.type.includes('pdf')) return addToast('Please drop a PDF file', 'error');
-    if (dropped.size > 10 * 1024 * 1024) return addToast('File too large (max 10MB)', 'error');
-    setFile(dropped);
-    setChatHistory([]);
-    setError(null);
-    addToast('PDF uploaded', 'success');
-  };
-
-  // Auto-scroll chat to bottom when new message or loading state changes
-  useEffect(() => {
-    const el = chatWindowRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [chatHistory, loading]);
-
-  // Keyboard shortcuts: Cmd/Ctrl+K clear chat, Cmd/Ctrl+U open file
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setChatHistory([]);
-        addToast('Chat cleared', 'info');
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'u') {
-        e.preventDefault();
-        fileInputRef.current?.click();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [addToast]);
-
-  useEffect(() => {
-    const onMove = (e) => {
-      if (!isResizingRef.current) return;
-      const container = document.querySelector('.main-container');
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const pct = Math.min(80, Math.max(20, (x / rect.width) * 100));
-      setLeftSize(pct);
-    };
-    const stop = () => { isResizingRef.current = false; document.body.style.userSelect = ''; };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', stop);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', stop);
-    };
-  }, []);
-
-  const inputRef = useRef(null);
-  const onKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!loading) handleUpload();
-    }
-  };
-
-  function MarkdownResponse({ markdown }) {
-    return (
-      <div className="markdown-renderer">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-          {markdown}
-        </ReactMarkdown>
-      </div>
-    );
-  }
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
   return (
-    <ErrorBoundary>
-      <div className={`App ${darkMode ? 'dark' : 'light'}`}>
-        {toasts.map(t => (
-          <Toast key={t.id} message={t.message} type={t.type} onClose={() => removeToast(t.id)} />
-        ))}
-
-        <header className="topbar">
-          <div className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <span className="brand-logo">PDF</span>
-            <span className="brand-title">PDFGeek</span>
-          </div>
-          <div className="topbar-actions">
-            <button
-              className="mode-toggle"
-              onClick={() => setLightMode(prev => !prev)}
-              title={lightMode ? 'Switch to Dark' : 'Switch to Light'}
-            >
-              {darkMode ? 'Light' : 'Dark'}
-            </button>
-          </div>
-        </header>
-
-        <div className="main-container">
-          <div
-            className={`left-panel dropzone ${dragOver ? 'drag-over' : ''} ${collapseLeft ? 'collapsed' : ''}`}
-            style={collapseLeft ? {} : collapseRight ? { flex: 1, minWidth: 0 } : { width: `${leftSize}%` }}
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <input
-              ref={fileInputRef}
-              id="pdf-file-input"
-              type="file"
-              className="visually-hidden"
-              accept="application/pdf"
-              onChange={handleFileChange}
-            />
-            {collapseLeft ? (
-              <button
-                type="button"
-                className="panel-expand-btn"
-                onClick={() => setCollapseLeft(false)}
-                title="Expand PDF viewer"
-                aria-label="Expand PDF viewer"
-              >
-                PDF
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="panel-collapse-btn left"
-                  onClick={() => setCollapseLeft(true)}
-                  title="Collapse PDF viewer"
-                  aria-label="Collapse PDF viewer"
-                >
-                  Collapse
-                </button>
-                {file ? (
-                  <>
-                    <div className="pdf-panel-sticky-header">
-                      <div className="file-preview-card">
-                        <span className="file-preview-name" title={file.name}>{file.name}</span>
-                        <span className="file-preview-size">{formatFileSize(file.size)}</span>
-                        <button
-                          type="button"
-                          className="change-file-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFile(null);
-                            setChatHistory([]);
-                            setError(null);
-                            addToast('File removed', 'info');
-                          }}
-                          title="Remove file"
-                        >
-                          Change File
-                        </button>
-                      </div>
-                    </div>
-                    <div className="pdf-panel-content">
-                      <PdfViewer file={file} key={file?.name} darkMode={darkMode} />
-                    </div>
-                  </>
-                ) : (
-                  <label htmlFor="pdf-file-input" className="dropzone-label">
-                    <div className="empty-drop">
-                      <div className="empty-illustration">Upload</div>
-                      <p>Click or drag a PDF here to upload</p>
-                      <small>Max 10MB - PDF only</small>
-                    </div>
-                  </label>
-                )}
-              </>
-            )}
-          </div>
-
-          <div
-            className="splitter"
-            style={{ display: collapseLeft || collapseRight ? 'none' : undefined }}
-            onMouseDown={() => { isResizingRef.current = true; document.body.style.userSelect = 'none'; }}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize panels"
-          />
-
-          <div className={`right-panel ${collapseRight ? 'collapsed' : ''}`} style={collapseRight ? {} : collapseLeft ? { flex: 1, minWidth: 0 } : { width: `${100 - leftSize}%` }}>
-            {collapseRight ? (
-              <button
-                type="button"
-                className="panel-expand-btn"
-                onClick={() => setCollapseRight(false)}
-                title="Expand chat"
-                aria-label="Expand chat"
-              >
-                Chat
-              </button>
-            ) : (
-              <>
-                <div className="chat-window" ref={chatWindowRef}>
-                  {error && (
-                    <div className="error-banner"><strong>Error:</strong> {error}</div>
-                  )}
-
-                  {chatHistory.length === 0 && !loading && (
-                    <div className="welcome-message">
-                      <h2>Welcome to PDFGeek</h2>
-                      <p>Upload a PDF and ask questions about its content.</p>
-                      {file && (
-                        <div className="quick-actions">
-                          <p className="quick-actions-label">Quick actions:</p>
-                          <div className="quick-action-chips">
-                            {QUICK_ACTIONS.map((action, i) => (
-                              <button
-                                key={i}
-                                className="quick-action-chip"
-                                onClick={() => handleQuickAction(action.prompt)}
-                                disabled={loading}
-                              >
-                                {action.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {chatHistory.map((msg, i) => {
-                    const prev = chatHistory[i - 1];
-                    const groupContinue = prev && prev.role === msg.role;
-                    const isAssistant = msg.role === 'assistant';
-                    const ts = msg.t ? new Date(msg.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                    const userMsgIndex = isAssistant ? chatHistory.slice(0, i).map((m, idx) => ({ m, idx })).reverse().find(x => x.m.role === 'user')?.idx : null;
-                    return (
-                      <div key={i} className={`chat-row ${msg.role} ${groupContinue ? 'group-continue' : ''}`}>
-                        {isAssistant && !groupContinue && <div className="avatar">AI</div>}
-                        {isAssistant && groupContinue && <div className="avatar avatar-spacer" aria-hidden />}
-                        <div className={`bubble ${msg.role}`}>
-                          <MarkdownResponse markdown={msg.content} />
-                          {isAssistant && msg.citations && msg.citations.length > 0 && (
-                            <details className="citations">
-                              <summary className="citations-heading">
-                                Answer based on {msg.citations.length} source{msg.citations.length !== 1 ? 's' : ''}
-                              </summary>
-                              <ul className="citations-list">
-                                {msg.citations.map((src, j) => (
-                                  <li key={j} className="citation-item">
-                                    <span className="citation-label">Source {src.index}</span>
-                                    <span className="citation-excerpt">{src.excerpt}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </details>
-                          )}
-                          <div className="meta">{isAssistant ? 'PDFGeek' : 'You'} - {ts}</div>
-                          {isAssistant && (
-                            <div className="action-bar">
-                              {userMsgIndex !== null && (
-                                <button type="button" className="mini-btn" onClick={() => handleRegenerateFor(userMsgIndex)} title="Regenerate">Regenerate</button>
-                              )}
-                              <button type="button" className="mini-btn" onClick={() => handleCopyFor(msg.content)} title="Copy">Copy</button>
-                              {i === chatHistory.length - 1 && (
-                                <button type="button" className="mini-btn" onClick={downloadChatHistory} title="Download chat">Download</button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        {msg.role === 'user' && !groupContinue && <div className="avatar">You</div>}
-                        {msg.role === 'user' && groupContinue && <div className="avatar avatar-spacer" aria-hidden />}
-                      </div>
-                    );
-                  })}
-
-                  {loading && (
-                    <div className="chat-row assistant">
-                      <div className="avatar">AI</div>
-                      <div className="bubble assistant thinking">
-                        <div className="skeleton-loader">
-                          <div className="skeleton-line"></div>
-                          <div className="skeleton-line short"></div>
-                          <div className="skeleton-line medium"></div>
-                        </div>
-                        <em className="thinking-label">{uploadPhase !== 'idle' ? `PDFGeek is ${uploadPhase}...` : 'PDFGeek is thinking...'}</em>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {loading && uploadPhase !== 'idle' && (
-                  <div className="progress-bar-wrap">
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{
-                          width: uploadPhase === 'extracting' ? '33%' : uploadPhase === 'embedding' ? '66%' : '100%',
-                        }}
-                      />
-                    </div>
-                    <span className="progress-label">
-                      {uploadPhase === 'extracting' && 'Extracting text...'}
-                      {uploadPhase === 'embedding' && 'Generating embeddings...'}
-                      {uploadPhase === 'answering' && 'Generating answer...'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="input-bar">
-                  {file && chatHistory.length > 0 && (
-                    <div className="quick-action-chips inline">
-                      {QUICK_ACTIONS.map((action, i) => (
-                        <button
-                          key={i}
-                          className="quick-action-chip small"
-                          onClick={() => handleQuickAction(action.prompt)}
-                          disabled={loading}
-                        >
-                          {action.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="input-row">
-                    <textarea
-                      ref={inputRef}
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                      onKeyDown={onKeyDown}
-                      placeholder="Ask anything about this PDF..."
-                      disabled={loading}
-                    />
-                    <div className="input-actions">
-                      <button className="secondary" onClick={downloadChatHistory} title="Download chat">Download</button>
-                      <button onClick={() => handleUpload()} disabled={loading || !file}>
-                        {loading ? 'Sending...' : 'Send'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="panel-collapse-btn right"
-                  onClick={() => setCollapseRight(true)}
-                  title="Collapse chat"
-                  aria-label="Collapse chat"
-                >
-                  Collapse
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+    <div className="App">
+      <h1>AI PDF Chatbot</h1>
+      <div className="form-row">
+        <input type="file" accept="application/pdf" onChange={handleFileChange} />
       </div>
-    </ErrorBoundary>
+      <div className="form-row">
+        <label htmlFor="question">Question / Prompt:</label>
+        <textarea
+          id="question"
+          rows={2}
+          value={question}
+          onChange={handleQuestionChange}
+        />
+      </div>
+      <button onClick={handleUpload}>Upload & Ask</button>
+      <p className="status">{status}</p>
+
+      {extractedText && (
+        <section className="text-block">
+          <h2>Extracted Text</h2>
+          <pre>{extractedText}</pre>
+        </section>
+      )}
+
+      {showLatex && answer && (
+        <section className="text-block">
+          <h2>AI Response</h2>
+          <pre className="latex-block">{answer}</pre>
+        </section>
+      )}
+    </div>
   );
 }
 
