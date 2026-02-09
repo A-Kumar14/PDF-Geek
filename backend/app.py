@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 from datetime import datetime
@@ -131,8 +132,9 @@ CORS(
     origins=[
         "http://localhost:3000",
         "https://localhost:3000",
-        "https://*.vercel.app",
         "https://pdf-geek.vercel.app",
+        re.compile(r"https://.*\.vercel\.app"),
+        re.compile(r"https://.*\.onrender\.com"),
     ],
 )
 
