@@ -6,11 +6,15 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including devDependencies needed for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
+
+# Build-time API URL (optional; default used if not set)
+ARG REACT_APP_API_BASE=http://localhost:5000
+ENV REACT_APP_API_BASE=$REACT_APP_API_BASE
 
 # Build the app
 RUN npm run build
