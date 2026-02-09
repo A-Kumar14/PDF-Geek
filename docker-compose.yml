@@ -23,10 +23,17 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+<<<<<<< HEAD
       args:
         - REACT_APP_API_BASE=http://localhost:5000
     ports:
       - "3000:80"
+=======
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
     depends_on:
       - backend
     restart: unless-stopped

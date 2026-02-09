@@ -24,6 +24,7 @@ class PDFService:
     def __init__(self):
         self.supported_extensions = ['.pdf']
         self.max_file_size = 10 * 1024 * 1024  # 10MB
+<<<<<<< HEAD
 
     def chunking_function(self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
         if not text:
@@ -62,6 +63,8 @@ class PDFService:
         except Exception as e:
             logger.error(f"Error chunking text: {str(e)}")
             return [text]
+=======
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
     
     def extract_text(self, filepath: str) -> Optional[str]:
         """

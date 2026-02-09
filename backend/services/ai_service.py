@@ -75,6 +75,7 @@ class AIService:
         except Exception as e:
             logger.error(f"Error during AI analysis: {str(e)}")
             return None
+<<<<<<< HEAD
 
     def answer_from_context(
         self,
@@ -137,6 +138,9 @@ class AIService:
         return [item.embedding for item in response.data]
 
 
+=======
+    
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
     def validate_file(self, filepath: str) -> bool:
         """
         Validate uploaded file

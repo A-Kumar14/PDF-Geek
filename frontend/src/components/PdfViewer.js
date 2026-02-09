@@ -4,28 +4,54 @@ import './PdfViewer.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+<<<<<<< HEAD
 const THUMB_SCALE = 0.15;
 
+=======
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
 function PdfViewer({ file, darkMode }) {
   const [pdfDoc, setPdfDoc] = useState(null);
   const [pageNum, setPageNum] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   const [rotation, setRotation] = useState(0);
+<<<<<<< HEAD
   const [thumbnails, setThumbnails] = useState([]);
   const canvasRef = useRef(null);
   const renderTaskRef = useRef(null);
   const containerRef = useRef(null);
+=======
+  const canvasRef = useRef(null);
+  const renderTaskRef = useRef(null);
+
+  const miniBtnStyle = {
+    fontSize: '0.75rem',
+    padding: '0.3rem 0.5rem',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    cursor: 'pointer',
+    backgroundColor: darkMode ? '#444' : '#f9f9f9',
+    color: darkMode ? '#fff' : '#000',
+    transition: 'all 0.2s ease-in-out'
+  };
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
 
   useEffect(() => {
     const loadPdf = async () => {
       if (!file) {
         setPdfDoc(null);
+<<<<<<< HEAD
         setThumbnails([]);
         const canvas = canvasRef.current;
         if (canvas) {
           const ctx = canvas.getContext('2d');
           if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+=======
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
         }
         return;
       }
@@ -39,8 +65,11 @@ function PdfViewer({ file, darkMode }) {
           setPdfDoc(pdf);
           setTotalPages(pdf.numPages);
           setPageNum(1);
+<<<<<<< HEAD
           setRotation(0);
           setThumbnails([]);
+=======
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
         } catch (err) {
           console.error("Error loading PDF", err);
         }
@@ -50,6 +79,7 @@ function PdfViewer({ file, darkMode }) {
     loadPdf();
   }, [file]);
 
+<<<<<<< HEAD
   // Load thumbnails when pdfDoc is ready
   useEffect(() => {
     if (!pdfDoc || pdfDoc.numPages === 0) return;
@@ -74,6 +104,8 @@ function PdfViewer({ file, darkMode }) {
     loadThumbs();
   }, [pdfDoc]);
 
+=======
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
   useEffect(() => {
     const renderPage = async (pageNumber) => {
       if (!pdfDoc) return;
@@ -113,6 +145,7 @@ function PdfViewer({ file, darkMode }) {
   }, [pdfDoc, pageNum, scale, rotation]);
 
   return (
+<<<<<<< HEAD
     <div className="pdf-viewer-wrap" ref={containerRef}>
       {pdfDoc && (
         <>
@@ -180,6 +213,38 @@ function PdfViewer({ file, darkMode }) {
           </div>
         </>
       )}
+=======
+    <div className="pdf-viewer">
+      {pdfDoc && (
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '0.8rem'
+        }}>
+          <button style={miniBtnStyle} onClick={() => setPageNum(p => Math.max(p - 1, 1))} disabled={pageNum <= 1}>⬅ Prev</button>
+          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Page {pageNum} of {totalPages}</span>
+          <button style={miniBtnStyle} onClick={() => setPageNum(p => Math.min(p + 1, totalPages))} disabled={pageNum >= totalPages}>Next ➡</button>
+
+          <button style={miniBtnStyle} onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}>➖ Zoom</button>
+          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>{Math.round(scale * 100)}%</span>
+          <button style={miniBtnStyle} onClick={() => setScale(s => Math.min(s + 0.2, 3))}>➕ Zoom</button>
+
+          <button style={miniBtnStyle} onClick={() => setRotation(r => (r - 90 + 360) % 360)}>⤴ Rot L</button>
+          <button style={miniBtnStyle} onClick={() => setRotation(r => (r + 90) % 360)}>⤵ Rot R</button>
+        </div>
+      )}
+
+      <div className="pdf-container">
+        {pdfDoc ? (
+          <canvas ref={canvasRef} />
+        ) : (
+          <div className="placeholder">Upload a PDF to preview</div>
+        )}
+      </div>
+>>>>>>> 0c32a561eab4198523fce77db149d6b5d0bd409f
     </div>
   );
 }
