@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconButton, Tooltip, alpha, useTheme } from '@mui/material';
+import { IconButton, Tooltip, alpha } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
@@ -8,7 +8,6 @@ import { sendFeedback } from '../api/sessions';
 
 export default function FeedbackButtons({ messageId }) {
   const [feedback, setFeedback] = useState(null);
-  const theme = useTheme();
 
   if (!messageId) return null;
 
