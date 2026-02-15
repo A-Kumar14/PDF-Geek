@@ -1,93 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
-:root {
-  --bg: #f8fafc;
-  --bg2: #e2e8f0;
-  --panel: #ffffff;
-  --text: #000000;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
-  --primary: #3b82f6;
-  --danger: #f44336;
-  --splitter: linear-gradient(180deg,#f1f5f9,#e2e8f0);
-}
-
-.App.dark {
-  --bg: #1e1e1e;
-  --bg2: #161616;
-  --panel: #151515;
-  --text: #ffffff;
-  --muted: #bdbdbd;
-  --border: #333333;
-}
-
+html, body, #root { height: 100%; margin: 0; padding: 0; }
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; }
-body { margin: 0; padding: 0; background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 100%); min-height: 100vh; color: var(--text); font-family: 'Source Sans Pro', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
 
-.App { min-height: 100vh; }
-
-/* Topbar */
-.topbar {
-  position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: .6rem 1rem; border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(8px);
-  background: rgba(255,255,255,.8);
-}
-.App.dark .topbar { background: rgba(20,20,20,.7); border-color: var(--border); }
-.brand { display:flex; align-items:center; gap:.6rem; cursor: pointer; }
-.brand-logo { font-size: 1rem; font-weight: 700; color: var(--primary); }
-.brand-title { font-weight: 700; }
-.topbar-actions { display:flex; gap:.5rem; align-items:center; }
-
-/* Layout */
-.main-container { display:flex; width:100vw; height:100vh; }
-.left-panel, .right-panel { overflow: hidden; flex: 1 1 0; display:flex; flex-direction:column; }
-.left-panel { border-right: 1px solid var(--border); background: var(--panel); }
-.right-panel { background: var(--panel); }
-
-/* Dropzone / file area */
-.dropzone { cursor: pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding:1rem; }
-.left-panel.drag-over { background: rgba(59,130,246,0.08); border:2px dashed var(--primary); }
-.visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
-
-/* PDF preview panel */
-.pdf-panel-sticky-header { position: sticky; top: 0; z-index: 4; padding: 0.5rem; background: rgba(255,255,255,.92); border-bottom: 1px solid var(--border); }
-.pdf-panel-content { flex: 1; overflow:auto; display:flex; flex-direction:column; }
-
-/* Splitter */
-.splitter { width:6px; cursor: col-resize; background: var(--splitter); }
-
-/* Chat window */
-.chat-window { display:flex; flex-direction:column; gap:.75rem; padding:1rem; overflow:auto; flex:1; }
-.welcome-message { text-align:center; padding:2rem; }
-.quick-action-chips { display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center; }
-.quick-action-chip { padding:.45rem .9rem; border-radius:20px; border:1px solid var(--border-strong); background:var(--panel); cursor:pointer; }
-
-/* Messages */
-.message-row { display:flex; gap:.6rem; align-items:flex-end; }
-.message-row.user { justify-content:flex-end; }
-.message-bubble { max-width: 68%; padding:.6rem .75rem; border-radius:12px; background:var(--bubble-assistant, #f4f4f5); color:var(--bubble-assistant-text, #121212); }
-.message-bubble.user { background: var(--bubble-user, #d0e8ff); color: var(--bubble-user-text, #0b2540); }
-
-/* Inputs and controls */
-.prompt-input { display:flex; gap:.5rem; padding:.6rem; border-top:1px solid var(--border); }
-.prompt-input textarea { flex:1; resize:none; padding:.5rem; border-radius:8px; border:1px solid var(--border-strong); }
-.prompt-input button { padding:.5rem .9rem; border-radius:8px; background:var(--primary); color:#fff; border:none; cursor:pointer; }
-
-/* Responsive */
-@media (max-width: 900px) {
-  .main-container { flex-direction:column; height:auto; }
-  .left-panel, .right-panel { width:100vw; height:auto; }
-  .splitter { display:none; }
+/* Smooth transitions for theme switching */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Minimal support for pdf-viewer classes (detailed styles live in PdfViewer.css) */
-.pdf-container { display:flex; justify-content:center; align-items:flex-start; }
-.pdf-thumb { cursor:pointer; }
-
-/* Utilities */
-.hidden { display:none !important; }
-.center { display:flex; align-items:center; justify-content:center; }
+/* Focus-visible for accessibility */
+:focus-visible {
+  outline: 2px solid #5E6AD2;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

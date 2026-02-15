@@ -21,6 +21,22 @@ node_modules/
 
 # Secrets
 .env
+.env.*
+!.env.example
 
 # ChromaDB
 **/chroma_data/
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+frontend/build/
+build/
+
+# Uploads
+backend/uploads/
+
+# OS
+Thumbs.db

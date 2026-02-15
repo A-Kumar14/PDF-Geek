@@ -21,26 +21,37 @@ class Config:
     RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "20"))
     RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 
+    # ChromaDB
+    CHROMA_PATH = os.getenv(
+        "CHROMA_PATH",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_data"),
+    )
+    NUM_RETRIEVAL_CHUNKS = int(os.getenv("NUM_RETRIEVAL_CHUNKS", "5"))
+    DEEP_THINK_CHUNKS = int(os.getenv("DEEP_THINK_CHUNKS", "12"))
+
+    # Audio
+    ALLOWED_AUDIO_EXTENSIONS = {'.mp3', '.wav', '.m4a', '.webm', '.ogg'}
+
     CORS_ORIGINS = [
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://pdf-geek.vercel.app",
-        "https://production-domain.com" 
+        "https://file-geek.vercel.app",
+        "https://production-domain.com"
     ]
-    
+
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     @classmethod
     def validate(cls):
         if not cls.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY environment variable is required")
-        
+
         if not cls.OPENAI_API_KEY.startswith('sk-'):
             raise ValueError("Invalid OpenAI API key format")
-        
+
         return True
-    
+
     @classmethod
     def get_cors_origins(cls):
         cors_origins = os.getenv("CORS_ORIGINS")
