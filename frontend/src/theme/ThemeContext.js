@@ -1,4 +1,4 @@
-import React, { createContext, useState, useMemo, useContext } from 'react';
+import React, { createContext, useState, useMemo, useContext, useEffect } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import createAcademicTheme from './academicTheme';
@@ -23,6 +23,11 @@ export function ThemeProviderWrapper({ children }) {
   };
 
   const theme = useMemo(() => createAcademicTheme(mode), [mode]);
+
+  // Sync 'dark' class to <html> for Tailwind dark: variants
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', mode === 'dark');
+  }, [mode]);
 
   return (
     <ThemeContext.Provider value={{ mode, toggleMode }}>

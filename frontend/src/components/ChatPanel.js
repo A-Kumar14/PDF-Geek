@@ -11,6 +11,7 @@ import QuickActions from './QuickActions';
 import SkeletonLoader from './SkeletonLoader';
 import VoiceInput from './VoiceInput';
 import SuggestionChips from './SuggestionChips';
+import SuggestedPrompts from './SuggestedPrompts';
 
 export default function ChatPanel() {
   const { messages, loading, loadingPhase, sendMessage, suggestions } = useChatContext();
@@ -131,6 +132,16 @@ export default function ChatPanel() {
         <div ref={chatEndRef} />
       </Box>
 
+      {/* Suggested prompts above input */}
+      {file && !loading && (
+        <Box sx={{ px: 1.5, pt: 1, pb: 0.5, borderTop: `1px solid ${theme.palette.divider}` }}>
+          <SuggestedPrompts
+            onPromptSelected={(text) => setInputText(text)}
+            dynamicPrompts={suggestions}
+          />
+        </Box>
+      )}
+
       {/* Input bar */}
       <Box
         component="form"
@@ -139,7 +150,7 @@ export default function ChatPanel() {
           display: 'flex',
           gap: 1,
           p: 1.5,
-          borderTop: `1px solid ${theme.palette.divider}`,
+          borderTop: file && !loading ? 'none' : `1px solid ${theme.palette.divider}`,
           alignItems: 'flex-end',
         }}
       >
