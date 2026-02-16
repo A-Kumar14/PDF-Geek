@@ -5,6 +5,8 @@ from typing import List, Dict, Optional
 from pathlib import Path
 
 from dotenv import load_dotenv
+from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
 
@@ -200,11 +202,19 @@ class AIService:
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable is required")
             genai.configure(api_key=api_key)
+            self.embeddings = GoogleGenerativeAIEmbeddings(
+                model=self.GEMINI_EMBEDDING_MODEL,
+                google_api_key=api_key,
+            )
         else:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OPENAI_API_KEY environment variable is required")
             self._openai_client = OpenAI(api_key=api_key)
+            self.embeddings = OpenAIEmbeddings(
+                model=self.OPENAI_EMBEDDING_MODEL,
+                openai_api_key=api_key,
+            )
 
     @property
     def client(self):
@@ -628,24 +638,7 @@ class AIService:
     def get_embeddings(self, text_list: List[str]) -> List[List[float]]:
         if not text_list:
             return []
-
-        if self.provider == "gemini":
-            result = genai.embed_content(
-                model=self.GEMINI_EMBEDDING_MODEL,
-                content=text_list,
-                task_type="retrieval_document",
-            )
-            embeddings = result.get("embedding", [])
-            if embeddings and not isinstance(embeddings[0], list):
-                return [embeddings]
-            return embeddings
-        else:
-            response = self._openai_client.embeddings.create(
-                model=self.OPENAI_EMBEDDING_MODEL,
-                input=text_list,
-                encoding_format="float",
-            )
-            return [item.embedding for item in response.data]
+        return self.embeddings.embed_documents(text_list)
 
     # ── File validation ─────────────────────────────────────────────────
     def validate_file(self, filepath: str) -> bool:

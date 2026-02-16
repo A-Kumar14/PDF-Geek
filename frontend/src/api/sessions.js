@@ -21,7 +21,7 @@ export async function deleteSession(sessionId) {
 
 export async function indexDocument(sessionId, { url, name }) {
   const res = await apiClient.post(`/sessions/${sessionId}/documents`, { url, name });
-  return res.data.document;
+  return res.data;
 }
 
 export async function sendSessionMessage(sessionId, { question, deepThink }) {
@@ -43,4 +43,14 @@ export async function transcribeAudio(file) {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return res.data.transcript;
+}
+
+export async function getTaskStatus(taskId) {
+  const res = await apiClient.get(`/tasks/${taskId}`);
+  return res.data;
+}
+
+export async function getS3PresignedUrl(fileName, contentType) {
+  const res = await apiClient.post('/s3/presign', { fileName, contentType });
+  return res.data;
 }

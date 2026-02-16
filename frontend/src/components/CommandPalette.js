@@ -23,11 +23,13 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import { useNavigate } from 'react-router-dom';
 import { useThemeMode } from '../theme/ThemeContext';
 import { usePersona } from '../contexts/PersonaContext';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
+import { useHighlights } from '../contexts/HighlightsContext';
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -42,6 +44,8 @@ export default function CommandPalette() {
   const { personas, selectPersona } = usePersona();
   const { file, removeFile } = useFile();
   const { sendMessage, clearMessages, clearAllSessions } = useChatContext();
+  const { toggleNotesPanel } = useHighlights();
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Global CMD+K / Ctrl+K listener
   useEffect(() => {
@@ -89,6 +93,20 @@ export default function CommandPalette() {
         category: 'Actions',
         action: () => clearAllSessions(),
       },
+      {
+        id: 'toggle-notes',
+        label: 'Toggle Research Notes',
+        icon: <PushPinIcon fontSize="small" />,
+        category: 'Actions',
+        action: () => toggleNotesPanel(),
+      },
+      {
+        id: 'shortcuts',
+        label: 'Show Keyboard Shortcuts',
+        icon: <KeyboardIcon fontSize="small" />,
+        category: 'Help',
+        action: () => setShowShortcuts(true),
+      },
     ];
 
     // File-specific commands
@@ -130,7 +148,7 @@ export default function CommandPalette() {
     });
 
     return cmds;
-  }, [mode, file, personas, toggleMode, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona]);
+  }, [mode, file, personas, toggleMode, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, toggleNotesPanel]);
 
   // Filter commands by query
   const filtered = useMemo(() => {
@@ -183,6 +201,7 @@ export default function CommandPalette() {
   const isDark = mode === 'dark';
 
   return (
+    <>
     <Dialog
       open={open}
       onClose={() => setOpen(false)}
@@ -375,5 +394,40 @@ export default function CommandPalette() {
         ))}
       </Box>
     </Dialog>
+
+      {/* Keyboard Shortcuts Dialog */}
+      <Dialog
+        open={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            backgroundColor: isDark ? alpha('#1A1A2E', 0.9) : alpha('#FFFFFF', 0.9),
+          },
+        }}
+      >
+        <Box sx={{ px: 3, py: 2 }}>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
+            Keyboard Shortcuts
+          </Typography>
+          {[
+            { keys: navigator.platform?.includes('Mac') ? '\u2318K' : 'Ctrl+K', desc: 'Command palette' },
+            { keys: 'Enter', desc: 'Send message' },
+            { keys: 'Shift+Enter', desc: 'New line in message' },
+            { keys: 'Esc', desc: 'Close dialogs / panels' },
+            { keys: '\u2190 \u2192', desc: 'Previous / next PDF page' },
+            { keys: '+  \u2212', desc: 'Zoom in / out PDF' },
+          ].map(({ keys, desc }) => (
+            <Box key={desc} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.75 }}>
+              <Typography variant="body2" color="text.secondary">{desc}</Typography>
+              <Chip label={keys} size="small" variant="outlined" sx={{ fontSize: '0.72rem', fontWeight: 600, height: 24, borderColor: theme.palette.divider }} />
+            </Box>
+          ))}
+        </Box>
+      </Dialog>
+    </>
   );
 }

@@ -8,7 +8,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { getSelectionBoundingRect } from '../utils/selectionUtils';
 import { useChatContext } from '../contexts/ChatContext';
 
-export default function SelectionToolbar({ containerRef, onHighlight, onComment, onOpenNotes }) {
+export default function SelectionToolbar({ containerRef, onHighlight, onComment, onOpenNotes, onAskAboutSelection }) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [commentMode, setCommentMode] = useState(false);
@@ -152,14 +152,18 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
               <CommentIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Ask AI" arrow>
+          <Tooltip title="Ask AI about selection" arrow>
             <IconButton
               size="small"
               onClick={() => {
                 const sel = window.getSelection();
                 const text = sel ? sel.toString().trim() : '';
-                if (text && sendMessage) {
-                  sendMessage(`Explain this passage: "${text}"`);
+                if (text) {
+                  if (onAskAboutSelection) {
+                    onAskAboutSelection(text);
+                  } else if (sendMessage) {
+                    sendMessage(`Explain this passage: "${text}"`);
+                  }
                 }
                 dismiss();
                 sel?.removeAllRanges();

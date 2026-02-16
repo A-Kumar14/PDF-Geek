@@ -71,9 +71,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const isAuthenticated = !!user;
+  const oidcEnabled = !!process.env.REACT_APP_OIDC_PROVIDER;
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated, oidcEnabled }}>
       {children}
     </AuthContext.Provider>
   );

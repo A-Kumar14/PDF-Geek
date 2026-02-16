@@ -1,12 +1,17 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Box, TextField, IconButton, Typography, Paper, alpha, useTheme } from '@mui/material';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { Box, TextField, IconButton, Typography, LinearProgress, Chip, alpha, useTheme } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
+import StopIcon from '@mui/icons-material/Stop';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import TuneIcon from '@mui/icons-material/Tune';
+
 import { useChatContext } from '../contexts/ChatContext';
 import { useFile } from '../contexts/FileContext';
 import { usePersona } from '../contexts/PersonaContext';
+import { useHighlights } from '../contexts/HighlightsContext';
+
 import ChatMessage from './ChatMessage';
+import FileViewer from './FileViewer';
 import QuickActions from './QuickActions';
 import SkeletonLoader from './SkeletonLoader';
 import VoiceInput from './VoiceInput';
@@ -14,23 +19,40 @@ import SuggestionChips from './SuggestionChips';
 import SuggestedPrompts from './SuggestedPrompts';
 
 export default function ChatPanel() {
-  const { messages, loading, loadingPhase, sendMessage, suggestions } = useChatContext();
-  const { file } = useFile();
+  const scrollRef = useRef(null);
+  const inputRef = useRef(null);
+  const {
+    messages,
+    addMessage,
+    isLoading,
+    streamingContent,
+    setStreamingContent,
+    setIsLoading,
+    stopGeneration,
+  } = useChatContext();
+  const { file, fileType } = useFile();
   const { persona } = usePersona();
-  const [inputText, setInputText] = useState('');
-  const chatEndRef = useRef(null);
+  const { scrollToHighlight } = useHighlights();
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
 
+  const [input, setInput] = useState('');
+  const [showPrompts, setShowPrompts] = useState(true);
+
+  // Auto-scroll to bottom
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, streamingContent, isLoading]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!inputText.trim() || !file || loading) return;
-    sendMessage(inputText);
-    setInputText('');
+    if ((!input.trim() && !file) || isLoading) return;
+
+    const userMsg = input;
+    setInput('');
+    setShowPrompts(false);
+    await addMessage(userMsg);
   };
 
   const handleKeyDown = (e) => {
@@ -41,160 +63,203 @@ export default function ChatPanel() {
   };
 
   const handleVoiceTranscript = (transcript) => {
-    setInputText((prev) => (prev ? prev + ' ' + transcript : transcript));
+    setInput((prev) => prev + (prev ? ' ' : '') + transcript);
   };
 
+  // Combine messages with streaming content for display
+  const displayMessages = useMemo(() => {
+    if (!streamingContent) return messages;
+    return [
+      ...messages,
+      {
+        id: 'streaming-temp',
+        role: 'assistant',
+        content: streamingContent,
+        isStreaming: true,
+      },
+    ];
+  }, [messages, streamingContent]);
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Chat messages */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-        {messages.length === 0 && (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              textAlign: 'center',
-              px: 3,
-            }}
-          >
-            {/* Accent icon */}
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.08),
-                mb: 2.5,
-              }}
-            >
-              {file
-                ? <AutoAwesomeIcon sx={{ fontSize: 28, color: 'primary.main' }} />
-                : <UploadFileIcon sx={{ fontSize: 28, color: 'primary.main' }} />}
-            </Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#000000', color: '#E5E5E5', fontFamily: 'monospace' }}>
 
-            <Typography
-              variant="h6"
-              fontWeight={700}
-              sx={{ letterSpacing: '-0.01em', mb: 0.5 }}
-            >
-              {file ? 'Ready to analyze' : 'Welcome to FileGeek'}
-            </Typography>
-
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ maxWidth: 280, lineHeight: 1.6, mb: 2.5 }}
-            >
-              {file
-                ? persona.greeting
-                : 'Drop a PDF, image, or document to start an AI-powered conversation.'}
-            </Typography>
-
-            {file && <QuickActions />}
-          </Box>
-        )}
-
-        {messages.map((msg, idx) => (
-          <ChatMessage key={idx} message={msg} />
-        ))}
-
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                maxWidth: '72%',
-                px: 2,
-                py: 1.2,
-                borderRadius: '12px',
-                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05),
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              }}
-            >
-              <SkeletonLoader phase={loadingPhase} />
-            </Paper>
-          </Box>
-        )}
-
-        {/* Suggestion chips at bottom of chat */}
-        {!loading && suggestions?.length > 0 && (
-          <Box sx={{ px: 1, pb: 1 }}>
-            <SuggestionChips suggestions={suggestions} />
-          </Box>
-        )}
-
-        <div ref={chatEndRef} />
+      {/* Header / Top Info */}
+      <Box sx={{ p: 1, borderBottom: '1px solid #333333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#888888' }}>
+          [ SESSION_ACTIVE ]
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#00FF00' }}>
+            ONLINE
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Suggested prompts above input */}
-      {file && !loading && (
-        <Box sx={{ px: 1.5, pt: 1, pb: 0.5, borderTop: `1px solid ${theme.palette.divider}` }}>
-          <SuggestedPrompts
-            onPromptSelected={(text) => setInputText(text)}
-            dynamicPrompts={suggestions}
-          />
-        </Box>
-      )}
-
-      {/* Input bar */}
+      {/* Messages Area */}
       <Box
-        component="form"
-        onSubmit={handleSubmit}
+        ref={scrollRef}
         sx={{
+          flex: 1,
+          overflowY: 'auto',
+          p: 2,
           display: 'flex',
-          gap: 1,
-          p: 1.5,
-          borderTop: file && !loading ? 'none' : `1px solid ${theme.palette.divider}`,
-          alignItems: 'flex-end',
+          flexDirection: 'column',
+          gap: 2,
         }}
       >
-        <VoiceInput onTranscript={handleVoiceTranscript} disabled={!file || loading} />
-        <TextField
-          fullWidth
-          multiline
-          maxRows={4}
-          size="small"
-          placeholder={file ? 'Ask a question...' : 'Upload a file first'}
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={!file || loading}
+        {displayMessages.length === 0 && showPrompts ? (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+            <Box sx={{ textAlign: 'center', opacity: 0.7 }}>
+              <Typography variant="h6" sx={{ fontFamily: 'monospace', fontWeight: 700, mb: 1 }}>
+                Input Required
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#888' }}>
+                Awaiting commands or queries...
+              </Typography>
+            </Box>
+            <SuggestedPrompts
+              onSelect={(prompt) => {
+                setInput(prompt);
+                // Optional: auto-submit or just fill
+              }}
+            />
+          </Box>
+        ) : (
+          displayMessages.map((msg, index) => (
+            <Box
+              key={msg.id || index}
+              sx={{
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+              }}
+            >
+              {/* Custom Message Bubble for Brutalist Theme */}
+              <Box
+                sx={{
+                  border: msg.role === 'user' ? '1px solid #E5E5E5' : '1px solid #333333',
+                  bgcolor: msg.role === 'user' ? '#000000' : '#0D0D0D',
+                  p: 1.5,
+                  position: 'relative',
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    position: 'absolute',
+                    top: -10,
+                    left: 10,
+                    bgcolor: '#000000',
+                    px: 0.5,
+                    fontFamily: 'monospace',
+                    color: msg.role === 'user' ? '#E5E5E5' : '#888888',
+                    fontSize: '0.7rem'
+                  }}
+                >
+                  {msg.role === 'user' ? '[ USER ]' : '[ SYS ]'}
+                </Typography>
+
+                {/* Simplified Message Content Rendering */}
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  {msg.content}
+                </Typography>
+
+                {msg.isStreaming && (
+                  <Box sx={{ display: 'inline-block', ml: 1, width: 8, height: 16, bgcolor: '#00FF00', animation: 'blink 1s step-end infinite' }} />
+                )}
+              </Box>
+            </Box>
+          ))
+        )}
+
+        {isLoading && !streamingContent && (
+          <Box sx={{ alignSelf: 'flex-start', maxWidth: '85%', border: '1px solid #333333', p: 2 }}>
+            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#888' }}>[ PROCESSING REQUEST ]</Typography>
+            <LinearProgress sx={{ mt: 1, bgcolor: '#333333', '& .MuiLinearProgress-bar': { bgcolor: '#00FF00' } }} />
+          </Box>
+        )}
+      </Box>
+
+      {/* Input Area */}
+      <Box sx={{ p: 2, borderTop: '1px solid #333333', bgcolor: '#000000' }}>
+        <SuggestionChips onSelect={(chip) => setInput(chip)} />
+
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
           sx={{
-            '& .MuiOutlinedInput-root': {
-              borderRadius: '10px',
-              fontSize: '0.9rem',
-            },
-          }}
-        />
-        <IconButton
-          type="submit"
-          color="primary"
-          disabled={!file || !inputText.trim() || loading}
-          sx={{
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            '&:hover': {
-              bgcolor: 'primary.dark',
-              transform: 'scale(1.05)',
-            },
-            '&.Mui-disabled': {
-              bgcolor: 'action.disabledBackground',
-              color: 'action.disabled',
-            },
-            borderRadius: '10px',
-            px: 2,
-            transition: 'all 0.15s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            border: '1px solid #333333',
+            p: 0.5, // Reduced padding tightens the look
+            '&:focus-within': {
+              border: '1px solid #E5E5E5'
+            }
           }}
         >
-          <SendIcon fontSize="small" />
-        </IconButton>
+          <Box sx={{ pl: 1, color: '#00FF00', fontFamily: 'monospace', fontWeight: 700, fontSize: '1.2rem' }}>
+            {'>'}
+          </Box>
+          <TextField
+            inputRef={inputRef}
+            fullWidth
+            multiline
+            maxRows={4}
+            placeholder="ENTER_COMMAND..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            variant="standard"
+            InputProps={{
+              disableUnderline: true,
+              sx: {
+                fontFamily: 'monospace',
+                color: '#E5E5E5',
+                fontSize: '0.9rem',
+                '& ::placeholder': { color: '#666', opacity: 1 }
+              }
+            }}
+          />
+
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {!isLoading ? (
+              <IconButton
+                type="submit"
+                disabled={!input.trim()}
+                sx={{
+                  color: '#E5E5E5',
+                  borderRadius: 0,
+                  '&:hover': { bgcolor: '#333333' },
+                  '&.Mui-disabled': { color: '#444' }
+                }}
+              >
+                <SendIcon fontSize="small" />
+              </IconButton>
+            ) : (
+              <IconButton
+                onClick={stopGeneration}
+                sx={{
+                  color: '#FF0000',
+                  borderRadius: 0,
+                  '&:hover': { bgcolor: '#330000' }
+                }}
+              >
+                <StopIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, gap: 1 }}>
+          <VoiceInput onTranscript={handleVoiceTranscript} />
+        </Box>
       </Box>
+
+      <style>{`
+        @keyframes blink {
+          50% { opacity: 0; }
+        }
+      `}</style>
     </Box>
   );
 }

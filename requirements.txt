@@ -31,8 +31,29 @@ Pillow==11.3.0
 # Vector store
 chromadb>=1.0.0,<2.0.0
 
+# LangChain RAG pipeline
+langchain==0.3.25
+langchain-core>=0.3.58
+langchain-text-splitters==0.3.8
+langchain-openai==0.3.12
+langchain-google-genai==2.1.4
+langchain-chroma==0.2.4
+
 # MCP (Model Context Protocol)
 mcp>=1.0.0
+
+# Async task queue
+celery[redis]==5.4.0
+redis==5.2.1
+
+# Rate limiting (distributed via Redis)
+Flask-Limiter==3.12
+
+# Structured logging
+structlog==25.1.0
+
+# AWS S3 (optional file storage)
+boto3==1.38.0
 
 # Production server
 gunicorn==23.0.0

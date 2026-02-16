@@ -1,7 +1,7 @@
 import os
 import re
 import json
-import logging
+import uuid
 from functools import wraps
 from datetime import datetime
 
@@ -11,6 +11,8 @@ load_dotenv()
 import jwt as pyjwt
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 
 from config import Config
@@ -20,104 +22,13 @@ from services.ai_service import AIService, PersonaManager, get_persona_prompt
 from services.file_service import FileService
 from services.rag_service import RAGService, MemoryService
 from services.tools import ToolExecutor
+from logging_config import get_logger
+from utils.validators import InputValidator, check_prompt_injection
 
 # ---------------------------------------------------------
-# Logging configuration
+# Structured logging
 # ---------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------
-# Simple in-file validation and rate limiting
-# ---------------------------------------------------------
-class InputValidator:
-    """Minimal input validation helpers for upload endpoint."""
-
-    ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".mp3", ".wav", ".m4a", ".webm", ".ogg"}
-    MAX_QUESTION_LENGTH = 2000
-
-    @classmethod
-    def validate_file_upload(cls, file):
-        if file is None:
-            return False, "No file provided"
-        filename = getattr(file, "filename", "") or ""
-        if filename.strip() == "":
-            return False, "No file selected"
-        lower = filename.lower()
-        if not any(lower.endswith(ext) for ext in cls.ALLOWED_EXTENSIONS):
-            return False, "Unsupported file type. Allowed: PDF, DOCX, TXT, PNG, JPG, MP3, WAV, M4A"
-        return True, ""
-
-    @classmethod
-    def validate_question(cls, question: str):
-        if not question or not question.strip():
-            return False, "Question cannot be empty"
-        if len(question) > cls.MAX_QUESTION_LENGTH:
-            return False, "Question is too long"
-        return True, ""
-
-    @staticmethod
-    def sanitize_input(text: str) -> str:
-        return text.strip()
-
-    @classmethod
-    def validate_chat_history(cls, history):
-        if history is None:
-            return True, ""
-        if not isinstance(history, list):
-            return False, "Chat history must be a list"
-        for item in history:
-            if not isinstance(item, dict):
-                return False, "Invalid chat history entry"
-            role = item.get("role")
-            content = item.get("content")
-            if role not in ("user", "assistant"):
-                return False, "Invalid role in chat history"
-            if not isinstance(content, str):
-                return False, "Invalid content in chat history"
-        return True, ""
-
-
-class IPRateLimiter:
-    """Very simple in-memory per-IP rate limiter."""
-
-    def __init__(self, max_requests: int = 20, window_seconds: int = 60):
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self._hits = {}
-
-    def _prune(self, ip: str, now: float):
-        timestamps = self._hits.get(ip, [])
-        cutoff = now - self.window_seconds
-        self._hits[ip] = [t for t in timestamps if t >= cutoff]
-
-    def is_allowed(self, ip: str):
-        import time
-
-        now = time.time()
-        self._prune(ip, now)
-        timestamps = self._hits.get(ip, [])
-        if len(timestamps) >= self.max_requests:
-            return False, 0
-        timestamps.append(now)
-        self._hits[ip] = timestamps
-        remaining = max(self.max_requests - len(timestamps), 0)
-        return True, remaining
-
-    def get_remaining_time(self, ip: str) -> int:
-        import time
-
-        now = time.time()
-        timestamps = self._hits.get(ip, [])
-        if not timestamps:
-            return 0
-        oldest = min(timestamps)
-        remaining = int(self.window_seconds - (now - oldest))
-        return max(remaining, 0)
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------
@@ -129,8 +40,18 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///users.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+
+# Initialize DB safe for multiple workers
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        # If multiple workers start at once, they might race to create tables. 
+        # We can safely ignore "table already exists" errors here.
+        if "already exists" in str(e):
+            pass
+        else:
+            logger.warning("db.create_all.error", error=str(e))
 
 CORS(
     app,
@@ -145,12 +66,50 @@ CORS(
 
 app.register_blueprint(auth_bp, url_prefix="/auth")
 
+# ---------------------------------------------------------
+# Flask-Limiter (distributed via Redis, falls back to memory)
+# ---------------------------------------------------------
+def _get_limiter_storage_uri():
+    """Use Redis if reachable, otherwise fall back to in-memory storage."""
+    uri = Config.RATELIMIT_STORAGE_URI
+    if uri and uri.startswith("redis"):
+        try:
+            import redis as _redis
+            r = _redis.from_url(uri, socket_connect_timeout=1)
+            r.ping()
+            return uri
+        except Exception:
+            logger.warning("limiter.redis.unavailable", msg="Falling back to in-memory rate limiting")
+    return "memory://"
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    storage_uri=_get_limiter_storage_uri(),
+    default_limits=[Config.RATELIMIT_DEFAULT],
+    strategy="fixed-window",
+)
+
+# ---------------------------------------------------------
+# Celery (optional — graceful fallback if Redis unavailable)
+# ---------------------------------------------------------
+_celery_available = False
+try:
+    from celery_app import celery_app, init_celery
+    init_celery(app)
+    _celery_available = True
+    logger.info("celery.initialized")
+except Exception as e:
+    logger.warning("celery.unavailable", error=str(e))
+
+# ---------------------------------------------------------
+# Services
+# ---------------------------------------------------------
 ai_service = AIService()
 file_service = FileService()
 rag_service = RAGService(ai_service, file_service)
 memory_service = MemoryService(ai_service)
 tool_executor = ToolExecutor(rag_service, ai_service)
-rate_limiter = IPRateLimiter()
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 MAX_CONTENT_LENGTH = Config.MAX_CONTENT_LENGTH
@@ -185,43 +144,28 @@ def _get_user_id():
 
 
 # ---------------------------------------------------------
-# Middleware
+# Middleware — structured request logging (rate limiting is now Flask-Limiter)
 # ---------------------------------------------------------
 @app.before_request
 def before_request():
-    """Log all requests and check rate limits."""
-
+    """Log all requests."""
     client_ip = request.remote_addr or "unknown"
-    logger.info(f"Request from {client_ip}: {request.method} {request.path}")
-
-    rate_limited_paths = ("/upload", "/ask", "/sessions")
-    if any(request.path.startswith(p) for p in rate_limited_paths):
-        is_allowed, remaining = rate_limiter.is_allowed(client_ip)
-        if not is_allowed:
-            remaining_time = rate_limiter.get_remaining_time(client_ip)
-            return (
-                jsonify(
-                    {
-                        "error": "Rate limit exceeded",
-                        "remaining_time": remaining_time,
-                        "message": f"Too many requests. Try again in {remaining_time} seconds.",
-                    }
-                ),
-                429,
-            )
+    logger.info("request.received", ip=client_ip, method=request.method, path=request.path)
 
 
 # ---------------------------------------------------------
 # Routes — Health & Personas
 # ---------------------------------------------------------
 @app.route("/health", methods=["GET"])
+@limiter.exempt
 def health_check():
     return (
         jsonify(
             {
                 "status": "healthy",
                 "timestamp": datetime.now().isoformat(),
-                "version": "3.0.0",
+                "version": "4.0.0",
+                "celery_available": _celery_available,
             }
         ),
         200,
@@ -231,6 +175,93 @@ def health_check():
 @app.route("/personas", methods=["GET"])
 def list_personas():
     return jsonify({"personas": PersonaManager.list_all()}), 200
+
+
+# =========================================================
+# CELERY TASK POLLING
+# =========================================================
+
+@app.route("/tasks/<task_id>", methods=["GET"])
+@jwt_required
+def get_task_status(task_id):
+    """Poll a Celery task by ID. Returns status, phase, progress, and result."""
+    if not _celery_available:
+        return jsonify({"error": "Async tasks not available"}), 503
+
+    from celery.result import AsyncResult
+    result = AsyncResult(task_id, app=celery_app)
+
+    state = result.state
+    meta = result.info if isinstance(result.info, dict) else {}
+
+    # Map Celery states to progress
+    progress_map = {
+        "PENDING": 5,
+        "DOWNLOADING": 20,
+        "EXTRACTING": 50,
+        "INDEXING": 80,
+        "SUCCESS": 100,
+        "FAILURE": 0,
+    }
+
+    response = {
+        "task_id": task_id,
+        "status": state,
+        "phase": meta.get("phase", state.lower()),
+        "progress": progress_map.get(state, 50),
+    }
+
+    if state == "SUCCESS":
+        response["result"] = result.result
+        response["progress"] = 100
+    elif state == "FAILURE":
+        response["error"] = str(result.info)
+        response["progress"] = 0
+
+    return jsonify(response), 200
+
+
+# =========================================================
+# S3 PRESIGNED URL
+# =========================================================
+
+@app.route("/s3/presign", methods=["POST"])
+@jwt_required
+@limiter.limit("10/minute")
+def s3_presign():
+    """Generate a presigned S3 PUT URL for direct upload."""
+    if not Config.S3_ENABLED:
+        return jsonify({"error": "S3 uploads not enabled"}), 404
+
+    import boto3
+
+    data = request.get_json(silent=True) or {}
+    file_name = data.get("fileName", "file")
+    content_type = data.get("contentType", "application/octet-stream")
+    user_id = _get_user_id()
+
+    key = f"uploads/{user_id}/{uuid.uuid4()}_{secure_filename(file_name)}"
+
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
+        region_name=Config.AWS_S3_REGION,
+    )
+
+    upload_url = s3_client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": Config.AWS_S3_BUCKET,
+            "Key": key,
+            "ContentType": content_type,
+        },
+        ExpiresIn=300,
+    )
+
+    file_url = f"https://{Config.AWS_S3_BUCKET}.s3.{Config.AWS_S3_REGION}.amazonaws.com/{key}"
+
+    return jsonify({"uploadUrl": upload_url, "key": key, "fileUrl": file_url}), 200
 
 
 # =========================================================
@@ -293,8 +324,13 @@ def delete_session(session_id):
 
 @app.route("/sessions/<session_id>/documents", methods=["POST"])
 @jwt_required
+@limiter.limit("20/minute")
 def index_session_document(session_id):
-    """Index a document into a session's RAG collection."""
+    """Index a document into a session's RAG collection.
+
+    If Celery is available, dispatches async and returns 202 with task_id.
+    Otherwise falls back to synchronous indexing.
+    """
     user_id = _get_user_id()
     session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
     if not session:
@@ -314,15 +350,29 @@ def index_session_document(session_id):
         "https://ufs.sh/",
         "https://4k40e5rcbl.ufs.sh/",
     )
+    # Also allow S3 URLs if S3 is enabled
+    if Config.S3_ENABLED and Config.AWS_S3_BUCKET:
+        allowed_prefixes = allowed_prefixes + (
+            f"https://{Config.AWS_S3_BUCKET}.s3.{Config.AWS_S3_REGION}.amazonaws.com/",
+        )
+
     if not any(file_url.startswith(p) for p in allowed_prefixes):
         return jsonify({"error": "File URL origin not allowed"}), 400
 
+    # Async path: dispatch Celery task
+    if _celery_available:
+        from tasks.document_tasks import index_document_task
+        task = index_document_task.delay(session_id, user_id, file_url, file_name)
+        logger.info("document.task.dispatched", task_id=task.id, session_id=session_id)
+        return jsonify({"task_id": task.id, "status": "queued"}), 202
+
+    # Synchronous fallback (dev without Redis)
     document_id = f"{session_id}_{secure_filename(file_name)}_{datetime.now().strftime('%H%M%S')}"
 
     try:
         result = rag_service.index_from_url(file_url, file_name, document_id, session_id, user_id)
     except Exception as e:
-        logger.error(f"Document indexing failed: {e}")
+        logger.error("document.index.failed", error=str(e))
         return jsonify({"error": f"Failed to index document: {file_name}"}), 500
 
     doc_record = SessionDocument(
@@ -345,8 +395,13 @@ def index_session_document(session_id):
 
 @app.route("/sessions/<session_id>/messages", methods=["POST"])
 @jwt_required
+@limiter.limit("20/minute")
 def send_session_message(session_id):
-    """Send a message in a session — uses agentic RAG pipeline."""
+    """Send a message in a session — uses agentic RAG pipeline.
+
+    If request body contains async=true and Celery is available,
+    dispatches async and returns 202. Otherwise runs synchronously.
+    """
     user_id = _get_user_id()
     session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
     if not session:
@@ -358,13 +413,27 @@ def send_session_message(session_id):
     if not is_valid:
         return jsonify({"error": error_msg}), 400
 
+    # Prompt injection detection (defense-in-depth, logs warning only)
+    if check_prompt_injection(question):
+        logger.warning("prompt_injection.detected", question_prefix=question[:80], session_id=session_id)
+
     deep_think = bool(data.get("deepThink", False))
-    model_override = AIService.RESPONSE_MODEL if deep_think else None
+    use_async = bool(data.get("async", False))
 
     # Save user message
     user_msg = ChatMessage(session_id=session_id, role="user", content=question)
     db.session.add(user_msg)
     db.session.commit()
+
+    # Async path
+    if use_async and _celery_available:
+        from tasks.message_tasks import send_message_task
+        task = send_message_task.delay(session_id, user_id, question, deep_think)
+        logger.info("message.task.dispatched", task_id=task.id, session_id=session_id)
+        return jsonify({"task_id": task.id, "status": "queued", "user_message_id": user_msg.id}), 202
+
+    # Synchronous path
+    model_override = AIService.RESPONSE_MODEL if deep_think else None
 
     # Build chat history from DB
     recent_msgs = ChatMessage.query.filter_by(session_id=session_id).order_by(
@@ -381,7 +450,7 @@ def send_session_message(session_id):
             memory_context = " | ".join(memories[:3])
         preference_context = memory_service.get_user_preferences(user_id)
     except Exception as e:
-        logger.warning(f"Memory retrieval failed: {e}")
+        logger.warning("memory.retrieval.failed", error=str(e))
 
     # Agentic RAG pipeline
     result = ai_service.answer_with_tools(
@@ -462,7 +531,7 @@ def message_feedback(message_id):
                 feedback,
             )
     except Exception as e:
-        logger.warning(f"Failed to store feedback in memory: {e}")
+        logger.warning("memory.feedback.failed", error=str(e))
 
     return jsonify({"message": "Feedback recorded"}), 200
 
@@ -473,6 +542,7 @@ def message_feedback(message_id):
 
 @app.route("/transcribe", methods=["POST"])
 @jwt_required
+@limiter.limit("10/minute")
 def transcribe_audio():
     """Transcribe audio file using OpenAI Whisper API."""
     try:
@@ -509,7 +579,7 @@ def transcribe_audio():
                 pass
 
     except Exception as e:
-        logger.error(f"Transcription error: {e}")
+        logger.error("transcription.failed", error=str(e))
         return jsonify({"error": "Transcription failed"}), 500
 
 
@@ -527,6 +597,7 @@ ALLOWED_URL_PREFIXES = (
 
 @app.route("/upload", methods=["POST"])
 @jwt_required
+@limiter.limit("20/minute")
 def upload_file():
     """Handle file upload and analysis (legacy — kept for backward compat)."""
 
@@ -584,7 +655,7 @@ def upload_file():
             try:
                 f.save(filepath)
             except Exception as e:
-                logger.error(f"Error saving file: {str(e)}")
+                logger.error("file.save.failed", error=str(e))
                 return jsonify({"error": "Failed to save file"}), 500
 
             file_type = file_service.detect_file_type(filepath)
@@ -611,18 +682,16 @@ def upload_file():
             chunk_texts = [c["text"] for c in chunks_with_pages]
 
             if chunk_texts:
-                chunk_embeddings = ai_service.get_embeddings(chunk_texts)
-                chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(chunk_texts))]
-                chunk_metas = [
-                    {"document_id": document_id, "pages": json.dumps(c["pages"])}
+                from langchain_core.documents import Document as LCDocument
+                docs = [
+                    LCDocument(
+                        page_content=c["text"],
+                        metadata={"document_id": document_id, "pages": json.dumps(c["pages"])},
+                    )
                     for c in chunks_with_pages
                 ]
-                rag_service.collection.add(
-                    ids=chunk_ids,
-                    embeddings=chunk_embeddings,
-                    documents=chunk_texts,
-                    metadatas=chunk_metas,
-                )
+                chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(docs))]
+                rag_service.vectorstore.add_documents(docs, ids=chunk_ids)
                 all_chunks_with_pages.extend(
                     [(document_id, c) for c in chunks_with_pages]
                 )
@@ -633,23 +702,22 @@ def upload_file():
         relevant_chunks = []
         relevant_metas = []
         try:
-            question_embedding = ai_service.get_embeddings([question])[0]
             total_chunks = sum(1 for _ in all_chunks_with_pages)
-            results = rag_service.collection.query(
-                query_embeddings=[question_embedding],
-                n_results=min(n_chunks, max(1, total_chunks)),
+            results = rag_service.vectorstore.similarity_search(
+                query=question,
+                k=min(n_chunks, max(1, total_chunks)),
             )
-            relevant_chunks = results["documents"][0] if results["documents"] else []
-            relevant_metas = results["metadatas"][0] if results["metadatas"] else []
+            relevant_chunks = [doc.page_content for doc in results]
+            relevant_metas = [doc.metadata for doc in results]
         except Exception as e:
-            logger.warning(f"ChromaDB query failed: {e}")
+            logger.warning("chromadb.query.failed", error=str(e))
 
         # Cleanup ephemeral entries
         for doc_id, _ in all_chunks_with_pages:
             try:
                 rag_service.collection.delete(where={"document_id": doc_id})
             except Exception as e:
-                logger.warning(f"ChromaDB delete failed: {e}")
+                logger.warning("chromadb.delete.failed", error=str(e))
 
         ai_response = ai_service.answer_from_context(
             relevant_chunks, question, chat_history,
@@ -680,12 +748,13 @@ def upload_file():
         }), 200
 
     except Exception as e:
-        logger.error(f"Unexpected error in upload endpoint: {str(e)}")
+        logger.error("upload.failed", error=str(e))
         return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/ask", methods=["POST"])
 @jwt_required
+@limiter.limit("20/minute")
 def ask():
     """Accept file URLs (from UploadThing CDN) + question, run RAG pipeline."""
     import requests as http_requests
@@ -731,7 +800,7 @@ def ask():
                 dl_resp = http_requests.get(url, timeout=30, stream=True)
                 dl_resp.raise_for_status()
             except Exception as e:
-                logger.error(f"Failed to download file from {url}: {e}")
+                logger.error("file.download.failed", url=url, error=str(e))
                 return jsonify({"error": f"Failed to download file: {name}"}), 502
 
             filename = secure_filename(name) or "file"
@@ -768,18 +837,16 @@ def ask():
             chunk_texts = [c["text"] for c in chunks_with_pages]
 
             if chunk_texts:
-                chunk_embeddings = ai_service.get_embeddings(chunk_texts)
-                chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(chunk_texts))]
-                chunk_metas = [
-                    {"document_id": document_id, "pages": json.dumps(c["pages"])}
+                from langchain_core.documents import Document as LCDocument
+                docs = [
+                    LCDocument(
+                        page_content=c["text"],
+                        metadata={"document_id": document_id, "pages": json.dumps(c["pages"])},
+                    )
                     for c in chunks_with_pages
                 ]
-                rag_service.collection.add(
-                    ids=chunk_ids,
-                    embeddings=chunk_embeddings,
-                    documents=chunk_texts,
-                    metadatas=chunk_metas,
-                )
+                chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(docs))]
+                rag_service.vectorstore.add_documents(docs, ids=chunk_ids)
                 all_chunks_with_pages.extend(
                     [(document_id, c) for c in chunks_with_pages]
                 )
@@ -790,22 +857,21 @@ def ask():
         relevant_chunks = []
         relevant_metas = []
         try:
-            question_embedding = ai_service.get_embeddings([question])[0]
             total_chunks = sum(1 for _ in all_chunks_with_pages)
-            results = rag_service.collection.query(
-                query_embeddings=[question_embedding],
-                n_results=min(n_chunks, max(1, total_chunks)),
+            results = rag_service.vectorstore.similarity_search(
+                query=question,
+                k=min(n_chunks, max(1, total_chunks)),
             )
-            relevant_chunks = results["documents"][0] if results["documents"] else []
-            relevant_metas = results["metadatas"][0] if results["metadatas"] else []
+            relevant_chunks = [doc.page_content for doc in results]
+            relevant_metas = [doc.metadata for doc in results]
         except Exception as e:
-            logger.warning(f"ChromaDB query failed: {e}")
+            logger.warning("chromadb.query.failed", error=str(e))
 
         for doc_id, _ in all_chunks_with_pages:
             try:
                 rag_service.collection.delete(where={"document_id": doc_id})
             except Exception as e:
-                logger.warning(f"ChromaDB delete failed: {e}")
+                logger.warning("chromadb.delete.failed", error=str(e))
 
         ai_response = ai_service.answer_from_context(
             relevant_chunks, question, chat_history,
@@ -836,7 +902,7 @@ def ask():
         }), 200
 
     except Exception as e:
-        logger.error(f"Unexpected error in /ask endpoint: {str(e)}")
+        logger.error("ask.failed", error=str(e))
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -845,6 +911,7 @@ def ask():
 # ---------------------------------------------------------
 @app.route("/tts", methods=["POST"])
 @jwt_required
+@limiter.limit("10/minute")
 def text_to_speech():
     """Convert text to speech using OpenAI TTS API with persona voice."""
     try:
@@ -872,7 +939,7 @@ def text_to_speech():
         return Response(audio_bytes, mimetype="audio/mpeg")
 
     except Exception as e:
-        logger.error(f"TTS error: {str(e)}")
+        logger.error("tts.failed", error=str(e))
         return jsonify({"error": "Failed to generate audio"}), 500
 
 
@@ -948,7 +1015,7 @@ def export_to_notion():
             return jsonify({"error": "Failed to create Notion page"}), 500
 
     except Exception as e:
-        logger.error(f"Notion export error: {str(e)}")
+        logger.error("notion.export.failed", error=str(e))
         return jsonify({"error": "Export failed"}), 500
 
 
@@ -972,7 +1039,7 @@ def export_markdown():
         )
 
     except Exception as e:
-        logger.error(f"Markdown export error: {str(e)}")
+        logger.error("markdown.export.failed", error=str(e))
         return jsonify({"error": "Export failed"}), 500
 
 
@@ -1011,7 +1078,7 @@ def export_enex():
         )
 
     except Exception as e:
-        logger.error(f"ENEX export error: {str(e)}")
+        logger.error("enex.export.failed", error=str(e))
         return jsonify({"error": "Export failed"}), 500
 
 
@@ -1028,9 +1095,17 @@ def not_found(e):
     return jsonify({"error": "Endpoint not found"}), 404
 
 
+@app.errorhandler(429)
+def rate_limited(e):
+    return jsonify({
+        "error": "Rate limit exceeded",
+        "retry_after": e.description if hasattr(e, "description") else "Please wait before retrying.",
+    }), 429
+
+
 @app.errorhandler(500)
 def internal_error(e):
-    logger.error(f"Internal server error: {str(e)}")
+    logger.error("internal_error", error=str(e))
     return jsonify({"error": "Internal server error"}), 500
 
 

@@ -1,14 +1,13 @@
 import React, { createContext, useState, useContext, useCallback, useRef, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import useChat from '../hooks/useChat';
 import { useFile } from './FileContext';
 import { usePersona } from './PersonaContext';
+import { useSessionsList, useCreateSession, useDeleteSession } from '../hooks/useSessions';
+import useDocumentIndexing from '../hooks/useDocumentIndexing';
 import {
-  listSessions,
-  createSession as apiCreateSession,
   getSession as apiGetSession,
-  deleteSession as apiDeleteSession,
   sendSessionMessage,
-  indexDocument,
 } from '../api/sessions';
 
 const ChatContext = createContext(null);
@@ -37,27 +36,25 @@ export function ChatProvider({ children }) {
   const { sendMessage: apiSendMessage } = useChat();
   const fileCtx = useFile();
   const { personaId } = usePersona();
+  const queryClient = useQueryClient();
+
+  // React Query hooks for server state
+  const { data: serverSessions } = useSessionsList();
+  const createSessionMutation = useCreateSession();
+  const deleteSessionMutation = useDeleteSession();
+  const documentIndexing = useDocumentIndexing();
+
+  // Sync server sessions to local state
+  useEffect(() => {
+    if (serverSessions && serverSessions.length > 0) {
+      setChatSessions(serverSessions);
+    }
+  }, [serverSessions]);
 
   // Sync to localStorage as offline cache
   useEffect(() => {
     localStorage.setItem('filegeek-sessions', JSON.stringify(chatSessions));
   }, [chatSessions]);
-
-  // Load sessions from server on mount
-  useEffect(() => {
-    const token = localStorage.getItem('filegeek-token');
-    if (!token) return;
-
-    listSessions()
-      .then((serverSessions) => {
-        if (serverSessions && serverSessions.length > 0) {
-          setChatSessions(serverSessions);
-        }
-      })
-      .catch(() => {
-        // Fall back to localStorage sessions
-      });
-  }, []);
 
   const startLoadingPhases = useCallback(() => {
     setLoadingPhase('reading');
@@ -80,7 +77,7 @@ export function ChatProvider({ children }) {
 
     if (token) {
       try {
-        session = await apiCreateSession({
+        session = await createSessionMutation.mutateAsync({
           title: fileName || 'Untitled Session',
           persona: personaId || 'academic',
         });
@@ -110,7 +107,7 @@ export function ChatProvider({ children }) {
       return updated.slice(0, MAX_SESSIONS);
     });
     return session.id;
-  }, [personaId]);
+  }, [personaId, createSessionMutation]);
 
   const loadSession = useCallback(async (sessionId) => {
     setActiveSessionId(sessionId);
@@ -140,7 +137,7 @@ export function ChatProvider({ children }) {
     const token = localStorage.getItem('filegeek-token');
     if (token) {
       try {
-        await apiDeleteSession(sessionId);
+        await deleteSessionMutation.mutateAsync(sessionId);
       } catch {
         // Continue with local removal
       }
@@ -153,7 +150,7 @@ export function ChatProvider({ children }) {
       setArtifacts([]);
       setSuggestions([]);
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, deleteSessionMutation]);
 
   const saveCurrentSession = useCallback((updatedMessages) => {
     if (!activeSessionId) return;
@@ -173,15 +170,8 @@ export function ChatProvider({ children }) {
 
   const indexDocumentToSession = useCallback(async (sessionId, fileEntry) => {
     if (!fileEntry.uploadedUrl) return;
-    try {
-      await indexDocument(sessionId, {
-        url: fileEntry.uploadedUrl,
-        name: fileEntry.fileName,
-      });
-    } catch (err) {
-      console.error('Failed to index document:', err);
-    }
-  }, []);
+    documentIndexing.indexFile(sessionId, fileEntry);
+  }, [documentIndexing]);
 
   const sendMessage = useCallback(async (question) => {
     if (!fileCtx?.file || !question.trim()) return;
@@ -205,7 +195,7 @@ export function ChatProvider({ children }) {
       }
     }
 
-    const userMsg = { role: 'user', content: question.trim() };
+    const userMsg = { role: 'user', content: question.trim(), timestamp: new Date().toISOString() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setLoading(true);
@@ -247,10 +237,16 @@ export function ChatProvider({ children }) {
         message_id: result.message_id,
         artifacts: result.artifacts,
         suggestions: result.suggestions,
+        timestamp: new Date().toISOString(),
       };
       const finalMessages = [...newMessages, assistantMsg];
       setMessages(finalMessages);
       saveCurrentSession(finalMessages);
+
+      // Invalidate session query so React Query picks up new messages
+      if (sessionId) {
+        queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+      }
 
       if (result.artifacts?.length > 0) {
         setArtifacts((prev) => [...prev, ...result.artifacts]);
@@ -261,14 +257,20 @@ export function ChatProvider({ children }) {
     } catch (err) {
       console.error(err);
       const errorMsg = err.response?.data?.error || 'Something went wrong. Please try again.';
-      const finalMessages = [...newMessages, { role: 'assistant', content: `Error: ${errorMsg}` }];
+      const finalMessages = [...newMessages, {
+        role: 'assistant',
+        content: `Error: ${errorMsg}`,
+        isError: true,
+        failedQuestion: question.trim(),
+        timestamp: new Date().toISOString(),
+      }];
       setMessages(finalMessages);
       saveCurrentSession(finalMessages);
     } finally {
       setLoading(false);
       stopLoadingPhases();
     }
-  }, [fileCtx, messages, activeSessionId, deepThinkEnabled, personaId, apiSendMessage, startNewSession, saveCurrentSession, startLoadingPhases, stopLoadingPhases, indexDocumentToSession]);
+  }, [fileCtx, messages, activeSessionId, deepThinkEnabled, personaId, apiSendMessage, startNewSession, saveCurrentSession, startLoadingPhases, stopLoadingPhases, indexDocumentToSession, queryClient]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
@@ -281,7 +283,7 @@ export function ChatProvider({ children }) {
     const token = localStorage.getItem('filegeek-token');
     if (token) {
       for (const s of chatSessions) {
-        try { await apiDeleteSession(s.id); } catch { /* ignore */ }
+        try { await deleteSessionMutation.mutateAsync(s.id); } catch { /* ignore */ }
       }
     }
     setChatSessions([]);
@@ -290,10 +292,16 @@ export function ChatProvider({ children }) {
     setArtifacts([]);
     setSuggestions([]);
     localStorage.removeItem('filegeek-sessions');
-  }, [chatSessions]);
+  }, [chatSessions, deleteSessionMutation]);
 
   const toggleDeepThink = useCallback(() => {
     setDeepThinkEnabled((prev) => !prev);
+  }, []);
+
+  const renameSession = useCallback((sessionId, newTitle) => {
+    setChatSessions((prev) =>
+      prev.map((s) => s.id === sessionId ? { ...s, title: newTitle, fileName: newTitle } : s)
+    );
   }, []);
 
   const clearArtifacts = useCallback(() => {
@@ -316,10 +324,12 @@ export function ChatProvider({ children }) {
         startNewSession,
         loadSession,
         removeSession,
+        renameSession,
         artifacts,
         clearArtifacts,
         suggestions,
         setSuggestions,
+        documentIndexing,
       }}
     >
       {children}

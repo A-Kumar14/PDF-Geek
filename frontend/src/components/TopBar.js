@@ -12,10 +12,13 @@ import {
   ListItemText,
   Chip,
   Avatar,
+  Badge,
+  Tooltip,
   alpha,
   useTheme,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
@@ -28,11 +31,13 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import PolicyIcon from '@mui/icons-material/Policy';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CheckIcon from '@mui/icons-material/Check';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import { useNavigate } from 'react-router-dom';
 import { useThemeMode } from '../theme/ThemeContext';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
 import { usePersona } from '../contexts/PersonaContext';
+import { useHighlights } from '../contexts/HighlightsContext';
 import DeepThinkToggle from './DeepThinkToggle';
 
 const PERSONA_ICONS = {
@@ -44,13 +49,14 @@ const PERSONA_ICONS = {
   sherlock: <PolicyIcon fontSize="small" />,
 };
 
-export default function TopBar({ onToggleDrawer }) {
+export default function TopBar({ onToggleDrawer, drawerOpen, onOpenSettings }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const { mode, toggleMode } = useThemeMode();
   const { file, removeFile } = useFile();
   const { clearMessages } = useChatContext();
   const { personaId, selectPersona, personas, persona } = usePersona();
+  const { pinnedNotes, notesPanelOpen, toggleNotesPanel } = useHighlights();
   const [anchorEl, setAnchorEl] = useState(null);
 
   const handleNew = () => {
@@ -70,8 +76,8 @@ export default function TopBar({ onToggleDrawer }) {
           px: { xs: 1, md: 2 },
         }}
       >
-        <IconButton edge="start" onClick={onToggleDrawer} size="small">
-          <MenuIcon />
+        <IconButton edge="start" onClick={onToggleDrawer} size="small" aria-label="Toggle sidebar">
+          {drawerOpen ? <MenuOpenIcon /> : <MenuIcon />}
         </IconButton>
 
         {/* Logo */}
@@ -100,6 +106,24 @@ export default function TopBar({ onToggleDrawer }) {
           </Typography>
         </Box>
 
+        {/* Active filename */}
+        {file && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            noWrap
+            sx={{
+              maxWidth: { xs: 100, sm: 200, md: 280 },
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              opacity: 0.7,
+              display: { xs: 'none', sm: 'block' },
+            }}
+          >
+            {file.name}
+          </Typography>
+        )}
+
         <Box sx={{ flex: 1 }} />
 
         {/* CMD+K hint */}
@@ -108,6 +132,7 @@ export default function TopBar({ onToggleDrawer }) {
           label={navigator.platform?.includes('Mac') ? '\u2318K' : 'Ctrl+K'}
           size="small"
           variant="outlined"
+          aria-label="Open command palette"
           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
           sx={{
             height: 28,
@@ -127,6 +152,7 @@ export default function TopBar({ onToggleDrawer }) {
 
         {/* Persona Identity Hub */}
         <Chip
+          aria-label={`Current persona: ${persona.label}. Click to switch.`}
           avatar={
             <Avatar
               sx={{
@@ -217,6 +243,38 @@ export default function TopBar({ onToggleDrawer }) {
 
         <DeepThinkToggle />
 
+        <Tooltip title={notesPanelOpen ? 'Close research notes' : 'Research notes'}>
+          <IconButton
+            size="small"
+            onClick={toggleNotesPanel}
+            aria-label="Toggle research notes"
+            sx={{
+              color: notesPanelOpen ? 'primary.main' : 'text.secondary',
+              bgcolor: notesPanelOpen ? alpha(theme.palette.primary.main, isDark ? 0.15 : 0.1) : 'transparent',
+              '&:hover': {
+                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.12),
+              },
+              transition: 'all 0.15s',
+            }}
+          >
+            <Badge
+              badgeContent={pinnedNotes.length}
+              color="primary"
+              max={99}
+              sx={{
+                '& .MuiBadge-badge': {
+                  fontSize: '0.65rem',
+                  height: 16,
+                  minWidth: 16,
+                  display: pinnedNotes.length === 0 ? 'none' : 'flex',
+                },
+              }}
+            >
+              <PushPinIcon fontSize="small" />
+            </Badge>
+          </IconButton>
+        </Tooltip>
+
         {file && (
           <Button
             size="small"
@@ -237,11 +295,11 @@ export default function TopBar({ onToggleDrawer }) {
           </Button>
         )}
 
-        <IconButton onClick={toggleMode} size="small">
+        <IconButton onClick={toggleMode} size="small" aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
           {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
         </IconButton>
 
-        <IconButton onClick={() => navigate('/settings')} size="small">
+        <IconButton onClick={onOpenSettings || (() => navigate('/settings'))} size="small" aria-label="Settings">
           <SettingsIcon fontSize="small" />
         </IconButton>
       </Toolbar>

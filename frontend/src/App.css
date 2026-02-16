@@ -1,16 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+/* Fonts handled in index.css */
 
-html, body, #root { height: 100%; margin: 0; padding: 0; }
-* { box-sizing: border-box; }
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
 
 /* Smooth transitions for theme switching */
 body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Focus-visible for accessibility */
+/* Focus-visible for accessibility - High Contrast */
 :focus-visible {
-  outline: 2px solid #5E6AD2;
+  outline: 2px solid #00FF00;
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 0px;
+}
+
+/* Skip-to-content link for keyboard/screen reader users */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #00FF00;
+  color: #000;
+  padding: 8px 16px;
+  z-index: 10000;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 0;
+  transition: top 0.2s ease;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* Micro-animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pinPulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.2);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes recordingPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }

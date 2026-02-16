@@ -21,6 +21,25 @@ class Config:
     RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "20"))
     RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 
+    # Redis + Celery
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+    CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+
+    # Flask-Limiter (distributed rate limiting via Redis)
+    RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+    RATELIMIT_DEFAULT = os.getenv("RATELIMIT_DEFAULT", "200/hour")
+
+    # AWS S3 (optional upload storage)
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
+    AWS_S3_REGION = os.getenv("AWS_S3_REGION", "us-east-1")
+    S3_ENABLED = os.getenv("S3_ENABLED", "false").lower() == "true"
+
+    # PII masking
+    PII_MASKING_ENABLED = os.getenv("PII_MASKING_ENABLED", "true").lower() == "true"
+
     # ChromaDB
     CHROMA_PATH = os.getenv(
         "CHROMA_PATH",

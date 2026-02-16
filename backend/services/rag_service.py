@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 import chromadb
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -18,11 +20,13 @@ class RAGService:
         self.file_service = file_service
 
         os.makedirs(Config.CHROMA_PATH, exist_ok=True)
-        self._client = chromadb.PersistentClient(path=Config.CHROMA_PATH)
-        self.collection = self._client.get_or_create_collection(
-            name="document_chunks",
-            metadata={"description": "Document text chunks for RAG"},
+        self.vectorstore = Chroma(
+            collection_name="document_chunks",
+            persist_directory=Config.CHROMA_PATH,
+            embedding_function=ai_service.embeddings,
         )
+        # Keep raw collection reference for metadata-filtered deletes
+        self.collection = self.vectorstore._collection
 
     def index_document(self, filepath: str, document_id: str, session_id: str, user_id: int) -> Dict:
         """Extract, chunk, embed, and store a local file. Returns indexing stats."""
@@ -32,30 +36,26 @@ class RAGService:
 
         extracted_text = "\n\n".join(p["text"] for p in page_texts)
         chunks_with_pages = self.file_service.chunking_function_with_pages(page_texts)
-        chunk_texts = [c["text"] for c in chunks_with_pages]
 
-        if chunk_texts:
-            chunk_embeddings = self.ai_service.get_embeddings(chunk_texts)
-            chunk_ids = [f"{document_id}_chunk_{i}" for i in range(len(chunk_texts))]
-            chunk_metas = [
-                {
-                    "document_id": document_id,
-                    "session_id": session_id,
-                    "user_id": str(user_id),
-                    "pages": json.dumps(c["pages"]),
-                }
+        if chunks_with_pages:
+            docs = [
+                Document(
+                    page_content=c["text"],
+                    metadata={
+                        "document_id": document_id,
+                        "session_id": session_id,
+                        "user_id": str(user_id),
+                        "pages": json.dumps(c["pages"]),
+                    },
+                )
                 for c in chunks_with_pages
             ]
-            self.collection.add(
-                ids=chunk_ids,
-                embeddings=chunk_embeddings,
-                documents=chunk_texts,
-                metadatas=chunk_metas,
-            )
-            logger.info(f"Indexed {len(chunk_texts)} chunks for doc={document_id} session={session_id}")
+            ids = [f"{document_id}_chunk_{i}" for i in range(len(docs))]
+            self.vectorstore.add_documents(docs, ids=ids)
+            logger.info(f"Indexed {len(docs)} chunks for doc={document_id} session={session_id}")
 
         return {
-            "chunk_count": len(chunk_texts),
+            "chunk_count": len(chunks_with_pages),
             "page_count": len(page_texts),
             "text": extracted_text,
         }
@@ -96,33 +96,21 @@ class RAGService:
     def query(self, question: str, session_id: str, user_id: int, n_results: int = 5) -> Dict:
         """Session-scoped retrieval. Returns chunks, metas, and image paths."""
         try:
-            question_embedding = self.ai_service.get_embeddings([question])[0]
-
-            where_filter = {
+            filter_dict = {
                 "$and": [
                     {"session_id": session_id},
                     {"user_id": str(user_id)},
                 ]
             }
 
-            # Count docs for this session
-            try:
-                existing = self.collection.get(where=where_filter, limit=1)
-                total = len(existing["ids"]) if existing["ids"] else 0
-            except Exception:
-                total = n_results
-
-            if total == 0:
-                return {"chunks": [], "metas": []}
-
-            results = self.collection.query(
-                query_embeddings=[question_embedding],
-                n_results=min(n_results, max(1, total)),
-                where=where_filter,
+            results = self.vectorstore.similarity_search(
+                query=question,
+                k=n_results,
+                filter=filter_dict,
             )
 
-            chunks = results["documents"][0] if results["documents"] else []
-            metas = results["metadatas"][0] if results["metadatas"] else []
+            chunks = [doc.page_content for doc in results]
+            metas = [doc.metadata for doc in results]
 
             return {"chunks": chunks, "metas": metas}
 

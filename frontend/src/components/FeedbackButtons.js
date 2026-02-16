@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconButton, Tooltip, alpha } from '@mui/material';
+import { IconButton, Tooltip, Typography, alpha } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
@@ -8,23 +8,26 @@ import { sendFeedback } from '../api/sessions';
 
 export default function FeedbackButtons({ messageId }) {
   const [feedback, setFeedback] = useState(null);
+  const [showThanks, setShowThanks] = useState(false);
 
   if (!messageId) return null;
 
   const handleFeedback = async (type) => {
     if (feedback === type) return;
     setFeedback(type);
+    setShowThanks(true);
+    setTimeout(() => setShowThanks(false), 2000);
     try {
       await sendFeedback(messageId, type);
     } catch {
-      // Revert on error
       setFeedback(null);
+      setShowThanks(false);
     }
   };
 
   return (
     <>
-      <Tooltip title="Helpful" arrow>
+      <Tooltip title={feedback === 'up' ? 'Thanks!' : 'Helpful'} arrow>
         <IconButton
           size="small"
           onClick={() => handleFeedback('up')}
@@ -38,7 +41,7 @@ export default function FeedbackButtons({ messageId }) {
           {feedback === 'up' ? <ThumbUpIcon sx={{ fontSize: 16 }} /> : <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />}
         </IconButton>
       </Tooltip>
-      <Tooltip title="Not helpful" arrow>
+      <Tooltip title={feedback === 'down' ? 'Thanks!' : 'Not helpful'} arrow>
         <IconButton
           size="small"
           onClick={() => handleFeedback('down')}
@@ -52,6 +55,14 @@ export default function FeedbackButtons({ messageId }) {
           {feedback === 'down' ? <ThumbDownIcon sx={{ fontSize: 16 }} /> : <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />}
         </IconButton>
       </Tooltip>
+      {showThanks && (
+        <Typography
+          variant="caption"
+          sx={{ color: '#10B981', fontSize: '0.7rem', fontWeight: 600, animation: 'fadeIn 0.2s ease' }}
+        >
+          Thanks!
+        </Typography>
+      )}
     </>
   );
 }

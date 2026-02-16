@@ -1,11 +1,14 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import queryClient from './api/queryClient';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FileProvider } from './contexts/FileContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { PersonaProvider } from './contexts/PersonaContext';
 import { AnnotationProvider } from './contexts/AnnotationContext';
+import { HighlightsProvider } from './contexts/HighlightsContext';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import SettingsPage from './pages/SettingsPage';
@@ -44,16 +47,21 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <PersonaProvider>
-        <FileProvider>
-          <ChatProvider>
-            <AnnotationProvider>
-              <AppRoutes />
-            </AnnotationProvider>
-          </ChatProvider>
-        </FileProvider>
-      </PersonaProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <PersonaProvider>
+          <FileProvider>
+            <ChatProvider>
+              <AnnotationProvider>
+                <HighlightsProvider>
+                  <a href="#main-content" className="skip-to-content">Skip to content</a>
+                  <AppRoutes />
+                </HighlightsProvider>
+              </AnnotationProvider>
+            </ChatProvider>
+          </FileProvider>
+        </PersonaProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

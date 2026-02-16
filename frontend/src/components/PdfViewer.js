@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { Box, IconButton, Tooltip, Divider, Typography } from '@mui/material';
+import { Box, IconButton, Tooltip, Divider, Typography, TextField } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
@@ -10,6 +10,8 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import StickyNote2Icon from '@mui/icons-material/StickyNote2';
+import InvertColorsIcon from '@mui/icons-material/InvertColors';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import './PdfViewer.css';
 import HighlightLayer from './HighlightLayer';
 import SelectionToolbar from './SelectionToolbar';
@@ -24,10 +26,23 @@ function PdfViewer({ file, targetPage, onPageChange }) {
   const [pageNum, setPageNum] = useState(1);
   const [scale, setScale] = useState(1.0);
   const [rotation, setRotation] = useState(0);
+  const [darkFilter, setDarkFilter] = useState(false);
+  const [pageInput, setPageInput] = useState('');
   const containerRef = useRef(null);
   const pageWrapperRef = useRef(null);
 
-  const { addHighlight, addComment, setNotePanelOpen } = useAnnotations();
+  const { addHighlight, addComment, setNotePanelOpen, highlights, notes, comments } = useAnnotations();
+
+  const handleExportAnnotations = useCallback(() => {
+    const data = { highlights, notes, comments, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `annotations-${file?.name || 'document'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [highlights, notes, comments, file]);
 
   // Convert File object to ArrayBuffer for react-pdf
   const fileData = useMemo(() => {
@@ -101,17 +116,12 @@ function PdfViewer({ file, targetPage, onPageChange }) {
           <>
             <header className="pdf-viewer-sticky-header">
               <Box className="pdf-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem 0.75rem', justifyContent: 'center' }}>
-                <Typography variant="body2" sx={{ opacity: 0.85, mx: 0.5 }}>
-                  Page {pageNum} of {numPages}
-                </Typography>
-
-                <Divider orientation="vertical" flexItem />
-
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Tooltip title="Previous page" arrow>
                     <span>
                       <IconButton
                         size="small"
+                        aria-label="Previous page"
                         onClick={() => setPageNum(p => Math.max(p - 1, 1))}
                         disabled={pageNum <= 1}
                       >
@@ -119,10 +129,36 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                       </IconButton>
                     </span>
                   </Tooltip>
+                  <TextField
+                    size="small"
+                    value={pageInput || pageNum}
+                    onChange={(e) => setPageInput(e.target.value)}
+                    onBlur={() => {
+                      const val = parseInt(pageInput, 10);
+                      if (val >= 1 && val <= numPages) setPageNum(val);
+                      setPageInput('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = parseInt(pageInput, 10);
+                        if (val >= 1 && val <= numPages) setPageNum(val);
+                        setPageInput('');
+                        e.target.blur();
+                      }
+                    }}
+                    onFocus={() => setPageInput(String(pageNum))}
+                    slotProps={{ input: { sx: { textAlign: 'center', fontSize: '0.8rem', py: 0.25, px: 0.5 } } }}
+                    sx={{ width: 44, '& .MuiOutlinedInput-root': { borderRadius: '6px' } }}
+                    aria-label="Go to page"
+                  />
+                  <Typography variant="body2" sx={{ opacity: 0.85, whiteSpace: 'nowrap' }}>
+                    / {numPages}
+                  </Typography>
                   <Tooltip title="Next page" arrow>
                     <span>
                       <IconButton
                         size="small"
+                        aria-label="Next page"
                         onClick={() => setPageNum(p => Math.min(p + 1, numPages))}
                         disabled={pageNum >= numPages}
                       >
@@ -136,7 +172,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                   <Tooltip title="Zoom out" arrow>
-                    <IconButton size="small" onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}>
+                    <IconButton size="small" aria-label="Zoom out" onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}>
                       <ZoomOutIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -144,7 +180,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                     {Math.round(scale * 100)}%
                   </Typography>
                   <Tooltip title="Zoom in" arrow>
-                    <IconButton size="small" onClick={() => setScale(s => Math.min(s + 0.2, 3))}>
+                    <IconButton size="small" aria-label="Zoom in" onClick={() => setScale(s => Math.min(s + 0.2, 3))}>
                       <ZoomInIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -154,12 +190,12 @@ function PdfViewer({ file, targetPage, onPageChange }) {
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                   <Tooltip title="Rotate left" arrow>
-                    <IconButton size="small" onClick={() => setRotation(r => (r - 90 + 360) % 360)}>
+                    <IconButton size="small" aria-label="Rotate left" onClick={() => setRotation(r => (r - 90 + 360) % 360)}>
                       <RotateLeftIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Rotate right" arrow>
-                    <IconButton size="small" onClick={() => setRotation(r => (r + 90) % 360)}>
+                    <IconButton size="small" aria-label="Rotate right" onClick={() => setRotation(r => (r + 90) % 360)}>
                       <RotateRightIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -169,10 +205,27 @@ function PdfViewer({ file, targetPage, onPageChange }) {
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                   <Tooltip title="Notes" arrow>
-                    <IconButton size="small" onClick={() => setNotePanelOpen(true)} sx={{ color: '#f59e0b' }}>
+                    <IconButton size="small" aria-label="Open notes panel" onClick={() => setNotePanelOpen(true)} sx={{ color: '#f59e0b' }}>
                       <StickyNote2Icon fontSize="small" />
                     </IconButton>
                   </Tooltip>
+                  <Tooltip title={darkFilter ? 'Normal view' : 'Dark reading mode'} arrow>
+                    <IconButton
+                      size="small"
+                      aria-label="Toggle dark reading filter"
+                      onClick={() => setDarkFilter((d) => !d)}
+                      sx={{ color: darkFilter ? 'primary.main' : 'text.secondary' }}
+                    >
+                      <InvertColorsIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  {(highlights.length > 0 || notes.length > 0 || comments.length > 0) && (
+                    <Tooltip title="Export annotations" arrow>
+                      <IconButton size="small" aria-label="Export annotations" onClick={handleExportAnnotations}>
+                        <FileDownloadIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Box>
               </Box>
             </header>
@@ -201,7 +254,11 @@ function PdfViewer({ file, targetPage, onPageChange }) {
 
               {/* Main page view */}
               <div className="pdf-container">
-                <div className="pdf-page-wrapper" ref={pageWrapperRef}>
+                <div
+                  className="pdf-page-wrapper"
+                  ref={pageWrapperRef}
+                  style={darkFilter ? { filter: 'invert(0.88) hue-rotate(180deg)' } : undefined}
+                >
                   <Page
                     pageNumber={pageNum}
                     scale={scale}

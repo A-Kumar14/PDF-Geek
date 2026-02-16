@@ -19,6 +19,24 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
+html.dark .pdf-viewer-sticky-header {
+  background: rgba(26, 26, 46, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .pdf-thumbnails {
+  background: rgba(255, 255, 255, 0.02);
+  border-right-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .pdf-thumb {
+  background: #1a1a2e;
+}
+
+html.dark .pdf-page-wrapper {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 .pdf-toolbar {
   display: flex;
   flex-wrap: wrap;

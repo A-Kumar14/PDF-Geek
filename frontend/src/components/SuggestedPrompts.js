@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Chip, alpha, useTheme } from '@mui/material';
 import { Lightbulb, BookOpen, Search, ListChecks, BrainCircuit } from 'lucide-react';
 
 const DEFAULT_PROMPTS = [
@@ -17,6 +18,8 @@ const EXTENDED_PROMPTS = [
 
 export default function SuggestedPrompts({ onPromptSelected, dynamicPrompts }) {
   const [prompts, setPrompts] = useState(DEFAULT_PROMPTS);
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   // Update prompts when dynamic suggestions arrive from AI responses
   useEffect(() => {
@@ -48,30 +51,42 @@ export default function SuggestedPrompts({ onPromptSelected, dynamicPrompts }) {
   if (prompts.length === 0) return null;
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 1,
+        overflowX: 'auto',
+        pb: 0.5,
+        scrollbarWidth: 'none',
+        '&::-webkit-scrollbar': { display: 'none' },
+      }}
+    >
       {prompts.map((prompt) => {
         const Icon = prompt.icon;
         return (
-          <button
+          <Chip
             key={prompt.text}
-            type="button"
+            label={prompt.text}
+            icon={<Icon size={14} strokeWidth={2} />}
+            variant="outlined"
+            clickable
             onClick={() => handleClick(prompt)}
-            className={[
-              'bg-gray-100 dark:bg-gray-700',
-              'text-gray-800 dark:text-gray-200',
-              'px-3 py-1 rounded-full text-sm font-medium',
-              'flex items-center gap-1 cursor-pointer',
-              'hover:bg-gray-200 dark:hover:bg-gray-600',
-              'transition-colors duration-200',
-              'whitespace-nowrap shrink-0',
-              'border-0 outline-none',
-            ].join(' ')}
-          >
-            <Icon size={14} strokeWidth={2} />
-            <span>{prompt.text}</span>
-          </button>
+            aria-label={`Suggested prompt: ${prompt.text}`}
+            sx={{
+              flexShrink: 0,
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              borderRadius: '20px',
+              bgcolor: isDark ? alpha('#fff', 0.04) : alpha('#000', 0.03),
+              borderColor: theme.palette.divider,
+              '&:hover': {
+                bgcolor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.06),
+              },
+              transition: 'all 0.15s',
+            }}
+          />
         );
       })}
-    </div>
+    </Box>
   );
 }

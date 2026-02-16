@@ -26,4 +26,6 @@ module.exports = function (app) {
   app.use("/sessions", flaskProxy);
   app.use("/messages", flaskProxy);
   app.use("/transcribe", flaskProxy);
+  app.use("/tasks", flaskProxy);
+  app.use("/s3", flaskProxy);
 };

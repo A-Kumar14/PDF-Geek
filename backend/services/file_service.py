@@ -4,6 +4,8 @@ from typing import Optional, List
 from pathlib import Path
 
 import pdfplumber
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
 # Try to import PyMuPDF with proper error handling
 try:
@@ -120,30 +122,12 @@ class FileService:
             return []
 
         try:
-            chunks = []
-            start = 0
-            text_len = len(text)
-
-            while start < text_len:
-                end = min(start + chunk_size, text_len)
-                if end < text_len:
-                    last_newline = text.rfind("\n", max(start, end - 100), end)
-                    if last_newline != -1:
-                        end = last_newline + 1
-                    else:
-                        last_space = text.rfind(" ", max(start, end - 50), end)
-                        if last_space != -1:
-                            end = last_space + 1
-
-                chunk = text[start:end].strip()
-                if chunk:
-                    chunks.append(chunk)
-
-                next_start = end - chunk_overlap
-                start = max(next_start, start + 1)
-                if start >= text_len:
-                    break
-
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                separators=["\n\n", "\n", ". ", " ", ""],
+            )
+            chunks = splitter.split_text(text)
             logger.info(f"Chunked into {len(chunks)} chunks")
             return chunks
 
@@ -241,31 +225,24 @@ class FileService:
             return []
 
         try:
-            segments = []
-            offset = 0
-            for pt in page_texts:
-                text = pt["text"]
-                segments.append({"page": pt["page"], "start": offset, "end": offset + len(text)})
-                offset += len(text) + 2
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                separators=["\n\n", "\n", ". ", " ", ""],
+            )
 
-            full_text = "\n\n".join(pt["text"] for pt in page_texts)
-            raw_chunks = self.chunking_function(full_text, chunk_size, chunk_overlap)
+            docs = [
+                Document(page_content=pt["text"], metadata={"page": pt["page"]})
+                for pt in page_texts
+            ]
+            split_docs = splitter.split_documents(docs)
 
             result = []
-            search_start = 0
-            for chunk in raw_chunks:
-                idx = full_text.find(chunk, search_start)
-                if idx == -1:
-                    idx = full_text.find(chunk)
-                chunk_start = idx if idx >= 0 else search_start
-                chunk_end = chunk_start + len(chunk)
-                search_start = chunk_start + 1
-
+            for doc in split_docs:
                 pages = sorted(set(
-                    seg["page"] for seg in segments
-                    if seg["start"] < chunk_end and seg["end"] > chunk_start
+                    [doc.metadata["page"]] if "page" in doc.metadata else []
                 ))
-                result.append({"text": chunk, "pages": pages})
+                result.append({"text": doc.page_content, "pages": pages})
 
             return result
 

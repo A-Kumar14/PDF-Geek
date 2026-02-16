@@ -7,9 +7,6 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import { useFile } from '../contexts/FileContext';
 
 function UploadStatusOverlay({ entry, index, onRetry }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
   if (!entry || entry.uploadStatus === 'pending') return null;
 
   if (entry.uploadStatus === 'uploading') {
@@ -19,25 +16,23 @@ function UploadStatusOverlay({ entry, index, onRetry }) {
           width: '100%',
           px: 2,
           py: 1,
-          mt: 0.5,
-          borderRadius: '8px',
-          bgcolor: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05),
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+          mt: 1,
+          border: '1px solid #333333',
+          bgcolor: '#0D0D0D',
         }}
       >
-        <Typography variant="caption" color="text.secondary" noWrap>
-          Uploading {entry.fileName}...
+        <Typography variant="caption" sx={{ color: '#E5E5E5', fontFamily: 'monospace' }} noWrap>
+          [UPLOADING] {entry.fileName}...
         </Typography>
         <LinearProgress
           variant="determinate"
           value={entry.uploadProgress}
           sx={{
-            mt: 0.5,
-            borderRadius: 3,
+            mt: 1,
             height: 4,
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            bgcolor: '#333333',
             '& .MuiLinearProgress-bar': {
-              borderRadius: 3,
+              bgcolor: '#00FF00',
             },
           }}
         />
@@ -50,19 +45,17 @@ function UploadStatusOverlay({ entry, index, onRetry }) {
       <Stack
         direction="row"
         alignItems="center"
-        spacing={0.5}
+        spacing={1}
         sx={{
-          mt: 0.5,
+          mt: 1,
           px: 1.5,
           py: 0.5,
-          borderRadius: '8px',
-          bgcolor: alpha('#10B981', isDark ? 0.1 : 0.06),
-          border: `1px solid ${alpha('#10B981', 0.15)}`,
+          border: '1px solid #00FF00',
+          bgcolor: 'rgba(0, 255, 0, 0.05)',
         }}
       >
-        <CheckCircleIcon sx={{ color: '#10B981', fontSize: 16 }} />
-        <Typography variant="caption" sx={{ color: '#10B981' }} noWrap>
-          {entry.fileName} uploaded
+        <Typography variant="caption" sx={{ color: '#00FF00', fontFamily: 'monospace' }} noWrap>
+          [OK] {entry.fileName} UPLOADED
         </Typography>
       </Stack>
     );
@@ -73,26 +66,24 @@ function UploadStatusOverlay({ entry, index, onRetry }) {
       <Stack
         direction="row"
         alignItems="center"
-        spacing={0.5}
+        spacing={1}
         sx={{
-          mt: 0.5,
-          px: 1.5,
+          mt: 1,
+          px: 1,
           py: 0.5,
-          borderRadius: '8px',
-          bgcolor: alpha('#EF4444', isDark ? 0.1 : 0.06),
-          border: `1px solid ${alpha('#EF4444', 0.15)}`,
+          border: '1px solid #FF0000',
+          bgcolor: 'rgba(255, 0, 0, 0.05)',
         }}
       >
-        <ErrorIcon sx={{ color: '#EF4444', fontSize: 16 }} />
-        <Typography variant="caption" sx={{ color: '#EF4444' }} noWrap>
-          {entry.fileName} failed
+        <Typography variant="caption" sx={{ color: '#FF0000', fontFamily: 'monospace' }} noWrap>
+          [ERROR] {entry.fileName} FAILED
         </Typography>
         <IconButton
           size="small"
           onClick={(e) => { e.stopPropagation(); onRetry(index); }}
-          sx={{ ml: 'auto', color: '#EF4444' }}
+          sx={{ ml: 'auto', color: '#FF0000', p: 0 }}
         >
-          <ReplayIcon sx={{ fontSize: 16 }} />
+          [RETRY]
         </IconButton>
       </Stack>
     );
@@ -105,8 +96,6 @@ export default function DropZone() {
   const { handleFileSelect, files, retryUpload } = useFile();
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
 
   const handleDrop = useCallback(
     (e) => {
@@ -121,6 +110,9 @@ export default function DropZone() {
 
   return (
     <Box
+      role="button"
+      tabIndex={0}
+      aria-label="Upload Terminal"
       onDrop={handleDrop}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
@@ -132,22 +124,17 @@ export default function DropZone() {
         justifyContent: 'center',
         height: '100%',
         cursor: 'pointer',
-        border: '2px dashed',
-        borderColor: dragOver
-          ? 'primary.main'
-          : alpha(isDark ? '#E5E7EB' : '#94A3B8', 0.25),
-        borderRadius: '12px',
-        m: 2,
-        transition: 'all 0.25s ease',
-        bgcolor: dragOver
-          ? alpha(theme.palette.primary.main, isDark ? 0.08 : 0.04)
-          : 'transparent',
-        '&:hover': {
-          borderColor: alpha(theme.palette.primary.main, 0.5),
-          bgcolor: alpha(theme.palette.primary.main, isDark ? 0.06 : 0.03),
-        },
+        border: dragOver ? '1px solid #00FF00' : '1px solid #333333',
+        bgcolor: dragOver ? '#0D0D0D' : '#000000',
+        transition: 'all 0.1s ease',
+        position: 'relative',
+        m: 0,
       }}
     >
+      {/* Decorative Grid Lines */}
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', bgcolor: '#333333' }} />
+      <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '1px', bgcolor: '#333333' }} />
+
       <input
         ref={fileInputRef}
         type="file"
@@ -156,33 +143,39 @@ export default function DropZone() {
         onChange={(e) => handleFileSelect(e.target.files[0])}
       />
 
-      {/* Icon with accent background */}
       <Box
         sx={{
-          width: 64,
-          height: 64,
-          borderRadius: '16px',
+          width: 80,
+          height: 80,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.08),
-          mb: 2,
-          transition: 'transform 0.2s ease',
-          ...(dragOver && { transform: 'scale(1.1)' }),
+          border: '1px solid #333333',
+          mb: 3,
+          color: dragOver ? '#00FF00' : '#888888',
         }}
       >
-        <CloudUploadIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+        <Typography variant="h3" sx={{ fontFamily: 'monospace', fontWeight: 300 }}>
+          {dragOver ? '[+]' : '[^]'}
+        </Typography>
       </Box>
 
-      <Typography variant="h6" fontWeight={600} sx={{ fontSize: '1rem', letterSpacing: '-0.01em' }}>
-        Drop a file here or click to browse
+      <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1rem', letterSpacing: '0.1em', color: '#E5E5E5', fontFamily: 'monospace' }}>
+        UPLOAD_TARGET
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        PDF, Word, Text, Images, and Audio (max 10 MB)
+      <Typography variant="body2" sx={{ mt: 1, color: '#666666', fontFamily: 'monospace' }}>
+        DROP FILES OR CLICK TO INITIALIZE
       </Typography>
 
+      <Box sx={{ mt: 4, display: 'flex', gap: 2, color: '#444444', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+        <span>PDF</span>
+        <span>DOCX</span>
+        <span>TXT</span>
+        <span>IMG</span>
+      </Box>
+
       {hasFiles && (
-        <Box sx={{ width: '100%', maxWidth: 360, mt: 2, px: 2 }}>
+        <Box sx={{ width: '100%', maxWidth: 400, mt: 4, px: 2 }}>
           {files.map((entry, i) => (
             <UploadStatusOverlay
               key={entry.fileName + i}
