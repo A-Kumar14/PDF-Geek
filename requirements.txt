@@ -18,7 +18,7 @@ python-docx==1.1.2
 pytesseract==0.3.13
 
 # AI — dual-provider (set AI_PROVIDER=gemini or openai in .env)
-google-generativeai
+google-generativeai>=0.8.0
 openai==1.95.1
 
 # Environment and configuration
@@ -57,3 +57,4 @@ boto3==1.38.0
 
 # Production server
 gunicorn==23.0.0
+
