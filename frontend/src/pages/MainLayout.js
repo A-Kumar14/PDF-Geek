@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button, Chip, Tab, Tabs, Dialog, DialogContent, alpha, useMediaQuery, useTheme } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Box, Button, Tab, Tabs, Dialog, DialogContent, useMediaQuery, useTheme } from '@mui/material';
 import TopBar from '../components/TopBar';
 import LeftDrawer from '../components/LeftDrawer';
 import ChatPanel from '../components/ChatPanel';
@@ -23,9 +22,7 @@ export default function MainLayout() {
   const [drawerOpen, setDrawerOpen] = useState(true);
   const { file, files, fileType, activeFileIndex, setActiveFileIndex, removeFile, targetPage, reportPageChange } = useFile();
   const { clearMessages, artifacts } = useChatContext();
-  const { persona } = usePersona();
   const { pinnedNotes, notesPanelOpen } = useHighlights();
-  const { mode } = useThemeMode();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -45,18 +42,7 @@ export default function MainLayout() {
   const showNotesPanel = notesPanelOpen;
   const showArtifacts = hasArtifacts && !showNotesPanel;
 
-  // Build grid columns based on state
-  const getGridColumns = () => {
-    if (isMobile) return '1fr';
 
-    const cols = [];
-    if (effectiveDrawer) cols.push(`${DRAWER_WIDTH}px`);
-    cols.push('1fr'); // viewer
-    cols.push('minmax(320px, 400px)'); // chat — responsive
-    if (showNotesPanel) cols.push('minmax(280px, 360px)'); // research notes
-    else if (showArtifacts) cols.push('minmax(280px, 360px)'); // artifacts
-    return cols.join(' auto '); // Use 'auto' or explicit gap simulation if needed, but we'll use border-right approach
-  };
 
   const borderStyle = `1px solid ${BORDER_COLOR}`;
 
