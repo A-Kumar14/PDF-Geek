@@ -482,11 +482,16 @@ def send_session_message(session_id):
     session.updated_at = datetime.utcnow()
     db.session.commit()
 
+    # Enrich artifacts with message_id for frontend tracking
+    artifacts = result.get("artifacts", [])
+    for artifact in artifacts:
+        artifact["message_id"] = assistant_msg.id
+
     return jsonify({
         "message_id": assistant_msg.id,
         "answer": result.get("answer", ""),
         "sources": result.get("sources", []),
-        "artifacts": result.get("artifacts", []),
+        "artifacts": artifacts,
         "suggestions": result.get("suggestions", []),
     }), 200
 
@@ -534,6 +539,103 @@ def message_feedback(message_id):
         logger.warning("memory.feedback.failed", error=str(e))
 
     return jsonify({"message": "Feedback recorded"}), 200
+
+
+# =========================================================
+# FLASHCARD PROGRESS
+# =========================================================
+
+@app.route("/flashcards/progress", methods=["POST"])
+@jwt_required
+def save_flashcard_progress():
+    """Save flashcard review progress for spaced repetition."""
+    from models import FlashcardProgress
+    from datetime import timedelta
+
+    user_id = _get_user_id()
+    data = request.get_json(silent=True) or {}
+
+    session_id = data.get("session_id")
+    message_id = data.get("message_id")
+    card_index = data.get("card_index")
+    card_front = data.get("card_front", "")
+    status = data.get("status", "remaining")  # remaining | reviewing | known
+
+    if not all([session_id, message_id is not None, card_index is not None]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    if status not in ("remaining", "reviewing", "known"):
+        return jsonify({"error": "Invalid status"}), 400
+
+    # Verify session ownership
+    session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
+    if not session:
+        return jsonify({"error": "Not authorized"}), 403
+
+    # Find or create progress record
+    progress = FlashcardProgress.query.filter_by(
+        session_id=session_id,
+        message_id=message_id,
+        card_index=card_index
+    ).first()
+
+    if not progress:
+        progress = FlashcardProgress(
+            session_id=session_id,
+            message_id=message_id,
+            card_index=card_index,
+            card_front=card_front[:255],  # Truncate to fit column
+        )
+        db.session.add(progress)
+
+    # Update status and SM-2 algorithm fields
+    progress.status = status
+    progress.review_count += 1
+    progress.updated_at = datetime.utcnow()
+
+    # Simple SM-2 spaced repetition logic
+    if status == "known":
+        # Increase ease and interval
+        progress.ease_factor = min(progress.ease_factor + 0.1, 2.5)
+        progress.interval_days = max(1, int(progress.interval_days * progress.ease_factor))
+        progress.next_review_date = datetime.utcnow() + timedelta(days=progress.interval_days)
+    elif status == "reviewing":
+        # Maintain ease, reset to shorter interval
+        progress.interval_days = 1
+        progress.next_review_date = datetime.utcnow() + timedelta(days=1)
+    else:  # remaining
+        # Reset to initial state
+        progress.ease_factor = 2.5
+        progress.interval_days = 1
+        progress.next_review_date = None
+
+    db.session.commit()
+
+    return jsonify({"message": "Progress saved", "progress": progress.to_dict()}), 200
+
+
+@app.route("/flashcards/progress/<session_id>/<int:message_id>", methods=["GET"])
+@jwt_required
+def load_flashcard_progress(session_id, message_id):
+    """Load flashcard progress for a specific session and message."""
+    from models import FlashcardProgress
+
+    user_id = _get_user_id()
+
+    # Verify session ownership
+    session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
+    if not session:
+        return jsonify({"error": "Not authorized"}), 403
+
+    # Get all progress records for this flashcard set
+    progress_records = FlashcardProgress.query.filter_by(
+        session_id=session_id,
+        message_id=message_id
+    ).order_by(FlashcardProgress.card_index).all()
+
+    return jsonify({
+        "progress": [p.to_dict() for p in progress_records]
+    }), 200
 
 
 # =========================================================

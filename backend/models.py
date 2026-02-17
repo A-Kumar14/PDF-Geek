@@ -136,3 +136,45 @@ class QuizResult(db.Model):
             "percentage": round((self.score / self.total_questions * 100), 1) if self.total_questions > 0 else 0,
             "created_at": self.created_at.isoformat(),
         }
+
+
+class FlashcardProgress(db.Model):
+    """Stores flashcard review progress for spaced repetition"""
+    __tablename__ = "flashcard_progress"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36), db.ForeignKey("study_sessions.id"), nullable=False)
+    message_id = db.Column(db.Integer, db.ForeignKey("chat_messages.id"), nullable=False)
+    card_index = db.Column(db.Integer, nullable=False)  # Index in the flashcard array
+    card_front = db.Column(db.String(255), nullable=False)  # For identification
+    status = db.Column(db.String(20), default="remaining")  # remaining | reviewing | known
+
+    # SM-2 spaced repetition algorithm fields
+    ease_factor = db.Column(db.Float, default=2.5)  # Ease of recall (2.5 is default)
+    interval_days = db.Column(db.Integer, default=1)  # Days until next review
+    next_review_date = db.Column(db.DateTime, nullable=True)  # When to review next
+    review_count = db.Column(db.Integer, default=0)  # Total times reviewed
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Unique constraint: one progress record per card per session/message
+    __table_args__ = (
+        db.UniqueConstraint('session_id', 'message_id', 'card_index', name='_session_message_card_uc'),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "message_id": self.message_id,
+            "card_index": self.card_index,
+            "card_front": self.card_front,
+            "status": self.status,
+            "ease_factor": self.ease_factor,
+            "interval_days": self.interval_days,
+            "next_review_date": self.next_review_date.isoformat() if self.next_review_date else None,
+            "review_count": self.review_count,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Tooltip, Button } from '@mui/material';
 import { useChatContext } from '../contexts/ChatContext';
+import axios from 'axios';
 
 function MermaidDiagram({ code }) {
   const containerRef = useRef(null);
@@ -224,13 +225,68 @@ function QuizCard({ data }) {
   );
 }
 
-function FlashcardComponent({ data }) {
+function FlashcardComponent({ data, messageId, sessionId }) {
   if (!data || !Array.isArray(data)) return null;
   const cards = data;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [cardStatus, setCardStatus] = useState(Array(cards.length).fill('remaining')); // 'remaining', 'reviewing', 'known'
+
+  // Load progress from API on mount
+  useEffect(() => {
+    const loadProgress = async () => {
+      const token = localStorage.getItem('filegeek-token');
+      if (!token || !messageId || !sessionId) return; // No auth or no IDs = skip persistence
+
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/flashcards/progress/${sessionId}/${messageId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const progress = response.data.progress || [];
+        if (progress.length > 0) {
+          const statusArray = Array(cards.length).fill('remaining');
+          progress.forEach(p => {
+            if (p.card_index >= 0 && p.card_index < cards.length) {
+              statusArray[p.card_index] = p.status;
+            }
+          });
+          setCardStatus(statusArray);
+        }
+      } catch (err) {
+        console.warn('Failed to load flashcard progress:', err);
+      }
+    };
+
+    loadProgress();
+  }, [messageId, sessionId, cards.length]);
+
+  const saveProgress = async (cardIndex, status) => {
+    const token = localStorage.getItem('filegeek-token');
+    if (!token || !messageId || !sessionId) return; // No auth = skip persistence
+
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/flashcards/progress`,
+        {
+          session_id: sessionId,
+          message_id: messageId,
+          card_index: cardIndex,
+          card_front: cards[cardIndex]?.front || '',
+          status,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to save flashcard progress:', err);
+    }
+  };
 
   const currentCard = cards[currentIndex];
   const remainingCount = cardStatus.filter(s => s === 'remaining').length;
@@ -259,6 +315,9 @@ function FlashcardComponent({ data }) {
     const newStatus = [...cardStatus];
     newStatus[currentIndex] = status;
     setCardStatus(newStatus);
+
+    // Save progress to API (async, don't wait)
+    saveProgress(currentIndex, status);
 
     // Auto-advance to next card
     if (currentIndex < cards.length - 1) {
@@ -565,7 +624,7 @@ function FlashcardComponent({ data }) {
   );
 }
 
-function ArtifactRenderer({ artifact }) {
+function ArtifactRenderer({ artifact, sessionId }) {
   const type = artifact.artifact_type || artifact.viz_type || 'unknown';
 
   if (type === 'visualization' && artifact.viz_type === 'mermaid' && artifact.content) {
@@ -584,7 +643,7 @@ function ArtifactRenderer({ artifact }) {
   if (type === 'flashcards' && artifact.content) {
     try {
       const data = typeof artifact.content === 'string' ? JSON.parse(artifact.content) : artifact.content;
-      return <FlashcardComponent data={data} />;
+      return <FlashcardComponent data={data} messageId={artifact.message_id} sessionId={artifact.session_id} />;
     } catch {
       return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>{artifact.content}</pre>;
     }
@@ -599,7 +658,7 @@ function ArtifactRenderer({ artifact }) {
 }
 
 export default function ArtifactPanel() {
-  const { artifacts, clearArtifacts } = useChatContext();
+  const { artifacts, clearArtifacts, activeSessionId } = useChatContext();
 
   if (!artifacts || artifacts.length === 0) return null;
 
@@ -631,7 +690,7 @@ export default function ArtifactPanel() {
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#888', mb: 1, textTransform: 'uppercase' }}>
               {`// ${artifact.artifact_type || 'artifact'}${artifact.topic ? ` - ${artifact.topic}` : ''}`}
             </Typography>
-            <ArtifactRenderer artifact={artifact} />
+            <ArtifactRenderer artifact={artifact} sessionId={activeSessionId} />
           </Box>
         ))}
       </Box>
