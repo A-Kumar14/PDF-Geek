@@ -41,17 +41,21 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
+from sqlalchemy.exc import OperationalError
+
 # Initialize DB safe for multiple workers
 with app.app_context():
     try:
         db.create_all()
-    except Exception as e:
-        # If multiple workers start at once, they might race to create tables. 
-        # We can safely ignore "table already exists" errors here.
-        if "already exists" in str(e):
+    except OperationalError as e:
+        # handling race condition for sqlite/postgres table creation
+        err_msg = str(e).lower()
+        if "already exists" in err_msg or "table" in err_msg and "exists" in err_msg:
             pass
         else:
             logger.warning("db.create_all.error", error=str(e))
+    except Exception as e:
+         logger.warning("db.create_all.unexpected_error", error=str(e))
 
 CORS(
     app,
