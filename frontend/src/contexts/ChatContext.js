@@ -32,6 +32,7 @@ export function ChatProvider({ children }) {
   const [artifacts, setArtifacts] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const phaseTimerRef = useRef(null);
+  const localStorageDebounceRef = useRef(null);
 
   const { sendMessage: apiSendMessage } = useChat();
   const fileCtx = useFile();
@@ -51,9 +52,20 @@ export function ChatProvider({ children }) {
     }
   }, [serverSessions]);
 
-  // Sync to localStorage as offline cache
+  // Sync to localStorage as offline cache (debounced 500ms to reduce thrashing)
   useEffect(() => {
-    localStorage.setItem('filegeek-sessions', JSON.stringify(chatSessions));
+    if (localStorageDebounceRef.current) {
+      clearTimeout(localStorageDebounceRef.current);
+    }
+    localStorageDebounceRef.current = setTimeout(() => {
+      localStorage.setItem('filegeek-sessions', JSON.stringify(chatSessions));
+    }, 500);
+
+    return () => {
+      if (localStorageDebounceRef.current) {
+        clearTimeout(localStorageDebounceRef.current);
+      }
+    };
   }, [chatSessions]);
 
   const startLoadingPhases = useCallback(() => {
