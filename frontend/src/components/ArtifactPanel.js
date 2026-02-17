@@ -31,13 +31,13 @@ function MermaidDiagram({ code }) {
 }
 
 function QuizCard({ data }) {
-  if (!data) return null;
   const questions = Array.isArray(data) ? data : [];
 
   // Track user answers: array of selected option indices (null = unanswered)
   const [userAnswers, setUserAnswers] = useState(Array(questions.length).fill(null));
   const [submitted, setSubmitted] = useState(false);
-  const [startTime] = useState(Date.now());
+
+  if (!data || questions.length === 0) return null;
 
   const handleSelectOption = (questionIndex, optionIndex) => {
     if (submitted) return; // Disable after submission
@@ -226,8 +226,7 @@ function QuizCard({ data }) {
 }
 
 function FlashcardComponent({ data, messageId, sessionId }) {
-  if (!data || !Array.isArray(data)) return null;
-  const cards = data;
+  const cards = Array.isArray(data) ? data : [];
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -288,6 +287,15 @@ function FlashcardComponent({ data, messageId, sessionId }) {
     }
   };
 
+  // Early return after all hooks
+  if (!data || cards.length === 0) {
+    return (
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#888', textAlign: 'center', p: 2 }}>
+        No flashcards available
+      </Typography>
+    );
+  }
+
   const currentCard = cards[currentIndex];
   const remainingCount = cardStatus.filter(s => s === 'remaining').length;
   const reviewingCount = cardStatus.filter(s => s === 'reviewing').length;
@@ -333,14 +341,6 @@ function FlashcardComponent({ data, messageId, sessionId }) {
     setFlipped(false);
     setCardStatus(Array(cards.length).fill('remaining'));
   };
-
-  if (cards.length === 0) {
-    return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#888', textAlign: 'center', p: 2 }}>
-        No flashcards available
-      </Typography>
-    );
-  }
 
   const currentStatus = cardStatus[currentIndex];
   const statusColor = {
