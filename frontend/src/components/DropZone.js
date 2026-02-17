@@ -1,9 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Box, Typography, LinearProgress, IconButton, Stack, alpha, useTheme } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import ReplayIcon from '@mui/icons-material/Replay';
+import { Box, Typography, LinearProgress, Stack } from '@mui/material';
 import { useFile } from '../contexts/FileContext';
 
 function UploadStatusOverlay({ entry, index, onRetry }) {
@@ -78,13 +74,13 @@ function UploadStatusOverlay({ entry, index, onRetry }) {
         <Typography variant="caption" sx={{ color: '#FF0000', fontFamily: 'monospace' }} noWrap>
           [ERROR] {entry.fileName} FAILED
         </Typography>
-        <IconButton
-          size="small"
+        <Box
+          component="span"
           onClick={(e) => { e.stopPropagation(); onRetry(index); }}
-          sx={{ ml: 'auto', color: '#FF0000', p: 0 }}
+          sx={{ ml: 'auto', cursor: 'pointer', color: '#FF0000', fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 700, '&:hover': { color: '#E5E5E5' } }}
         >
           [RETRY]
-        </IconButton>
+        </Box>
       </Stack>
     );
   }
@@ -161,10 +157,10 @@ export default function DropZone() {
       </Box>
 
       <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1rem', letterSpacing: '0.1em', color: '#E5E5E5', fontFamily: 'monospace' }}>
-        UPLOAD_TARGET
+        Upload Files
       </Typography>
       <Typography variant="body2" sx={{ mt: 1, color: '#666666', fontFamily: 'monospace' }}>
-        DROP FILES OR CLICK TO INITIALIZE
+        Drop files here or click to browse
       </Typography>
 
       <Box sx={{ mt: 4, display: 'flex', gap: 2, color: '#444444', fontSize: '0.75rem', fontFamily: 'monospace' }}>

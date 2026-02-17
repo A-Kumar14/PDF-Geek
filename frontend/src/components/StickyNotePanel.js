@@ -1,18 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  Paper,
-  Box,
-  Typography,
-  IconButton,
-  TextField,
-  Button,
-  Tooltip,
-} from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import { Box, Typography, TextField, Tooltip } from '@mui/material';
 import { useAnnotations } from '../contexts/AnnotationContext';
 import { useFile } from '../contexts/FileContext';
 
@@ -55,8 +43,7 @@ export default function StickyNotePanel() {
   if (!notePanelOpen) return null;
 
   return createPortal(
-    <Paper
-      elevation={12}
+    <Box
       sx={{
         position: 'fixed',
         left: pos.x,
@@ -66,10 +53,9 @@ export default function StickyNotePanel() {
         zIndex: 1300,
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: '12px',
         overflow: 'hidden',
-        border: 1,
-        borderColor: 'divider',
+        border: '1px solid #333333',
+        bgcolor: '#0D0D0D',
       }}
     >
       {/* Header */}
@@ -78,33 +64,38 @@ export default function StickyNotePanel() {
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1,
+          justifyContent: 'space-between',
           px: 1.5,
-          py: 1,
-          bgcolor: '#FFF9C4',
+          py: 0.75,
+          borderBottom: '1px solid #333333',
+          bgcolor: '#000000',
           cursor: 'grab',
           userSelect: 'none',
           '&:active': { cursor: 'grabbing' },
         }}
       >
-        <DragIndicatorIcon sx={{ fontSize: 18, color: '#9e9e9e' }} />
-        <Typography variant="body2" fontWeight={700} sx={{ flex: 1, color: '#5d4037' }} noWrap>
-          Notes — {file?.name || 'Untitled'}
+        <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#E5E5E5' }} noWrap>
+          NOTES — {file?.name || 'UNTITLED'}
         </Typography>
-        <IconButton size="small" onClick={() => setNotePanelOpen(false)}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
+        <Tooltip title="Close">
+          <Box
+            onClick={() => setNotePanelOpen(false)}
+            sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 700, '&:hover': { color: '#E5E5E5' } }}
+          >
+            [x]
+          </Box>
+        </Tooltip>
       </Box>
 
       {/* Notes list */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         {notes.length === 0 && (
-          <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 3 }}>
-            No notes yet. Click "+ Add Note" to start.
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#888', textAlign: 'center', py: 3 }}>
+            [NO_NOTES]
           </Typography>
         )}
         {notes.map((note) => (
-          <Box key={note.id} sx={{ position: 'relative' }}>
+          <Box key={note.id} sx={{ border: '1px solid #333333', p: 1 }}>
             <TextField
               multiline
               minRows={2}
@@ -112,39 +103,49 @@ export default function StickyNotePanel() {
               fullWidth
               size="small"
               defaultValue={note.content}
-              placeholder="Type your note..."
+              placeholder="TYPE_NOTE..."
               onBlur={(e) => updateNote(note.id, e.target.value)}
               sx={{
-                '& .MuiInputBase-root': { fontSize: '0.82rem', bgcolor: 'background.paper' },
+                '& .MuiInputBase-root': { fontSize: '0.8rem', fontFamily: 'monospace', bgcolor: '#000' },
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
+              <Typography sx={{ fontSize: '0.6rem', fontFamily: 'monospace', color: '#555' }}>
                 {new Date(note.createdAt).toLocaleString()}
               </Typography>
-              <Tooltip title="Delete note" arrow>
-                <IconButton size="small" onClick={() => removeNote(note.id)} sx={{ color: 'error.main' }}>
-                  <DeleteIcon sx={{ fontSize: 16 }} />
-                </IconButton>
+              <Tooltip title="Delete">
+                <Box
+                  onClick={() => removeNote(note.id)}
+                  sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700, '&:hover': { color: '#FF0000' } }}
+                >
+                  [DEL]
+                </Box>
               </Tooltip>
             </Box>
           </Box>
         ))}
       </Box>
 
-      {/* Add Note button */}
-      <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
-        <Button
-          fullWidth
-          size="small"
-          startIcon={<AddIcon />}
+      {/* Add Note */}
+      <Box sx={{ p: 1, borderTop: '1px solid #333333' }}>
+        <Box
           onClick={handleAddNote}
-          sx={{ textTransform: 'none', fontWeight: 600 }}
+          sx={{
+            cursor: 'pointer',
+            textAlign: 'center',
+            fontFamily: 'monospace',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: '#888',
+            py: 0.5,
+            border: '1px solid #333',
+            '&:hover': { borderColor: '#00FF00', color: '#00FF00' },
+          }}
         >
-          Add Note
-        </Button>
+          [ + ADD NOTE ]
+        </Box>
       </Box>
-    </Paper>,
+    </Box>,
     document.body
   );
 }

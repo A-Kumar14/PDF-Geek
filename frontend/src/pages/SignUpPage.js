@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { Container, TextField, Button, Typography, Box } from '@mui/material';
 import { useNavigate, Navigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SignUpPage() {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { signup, isAuthenticated } = useAuth();
   const [name, setName] = useState('');
@@ -52,97 +50,88 @@ export default function SignUpPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        bgcolor: '#000000',
       }}
     >
       <Container maxWidth="xs">
-        <Paper
-          elevation={0}
+        <Box
           sx={{
             p: 4,
-            borderRadius: 3,
-            backdropFilter: 'blur(16px)',
-            backgroundColor: alpha(theme.palette.background.paper, 0.7),
-            border: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            border: '1px solid #333333',
+            bgcolor: '#0D0D0D',
           }}
         >
           <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography variant="h4" fontWeight={800} color="primary.main">
-              File<Typography component="span" variant="h4" fontWeight={700} color="text.primary">
-                Geek
-              </Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.5rem', color: '#00FF00', letterSpacing: '0.1em' }}>
+              FileGeek
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#888', mt: 0.5 }}>
               Create your account
             </Typography>
           </Box>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
+            <Box sx={{ border: '1px solid #FF0000', p: 1, mb: 2 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#FF0000' }}>
+                ERROR: {error}
+              </Typography>
+            </Box>
           )}
 
           <Box component="form" onSubmit={handleSubmit}>
             <TextField
-              fullWidth
-              label="Name"
-              value={name}
+              fullWidth label="NAME" value={name}
               onChange={(e) => setName(e.target.value)}
-              sx={{ mb: 2 }}
-              autoFocus
+              sx={{ mb: 2 }} autoFocus
+              InputLabelProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
             />
             <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={email}
+              fullWidth label="EMAIL" type="email" value={email}
               onChange={(e) => setEmail(e.target.value)}
               sx={{ mb: 2 }}
+              InputLabelProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
             />
             <TextField
-              fullWidth
-              label="Password"
-              type="password"
-              value={password}
+              fullWidth label="PASSWORD" type="password" value={password}
               onChange={(e) => setPassword(e.target.value)}
               sx={{ mb: 2 }}
+              InputLabelProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
             />
             <TextField
-              fullWidth
-              label="Confirm Password"
-              type="password"
-              value={confirmPassword}
+              fullWidth label="CONFIRM_PASSWORD" type="password" value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               sx={{ mb: 3 }}
+              InputLabelProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
             />
             <Button
-              fullWidth
-              variant="contained"
-              type="submit"
-              size="large"
-              disabled={loading}
-              sx={{ py: 1.2 }}
+              fullWidth variant="contained" type="submit" disabled={loading}
+              sx={{
+                py: 1.2,
+                bgcolor: '#E5E5E5',
+                color: '#000',
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                '&:hover': { bgcolor: '#FFFFFF' },
+                '&.Mui-disabled': { bgcolor: '#333', color: '#888' },
+              }}
             >
-              {loading ? 'Creating Account...' : 'Sign Up'}
+              {loading ? '[ CREATING... ]' : '[ SIGN UP ]'}
             </Button>
           </Box>
 
           <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Already have an account?{' '}
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#888' }}>
+              Have an account?{' '}
               <Typography
                 component={RouterLink}
                 to="/login"
-                variant="body2"
-                color="primary.main"
-                sx={{ textDecoration: 'none', fontWeight: 600 }}
+                sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#00FF00', textDecoration: 'none', fontWeight: 700 }}
               >
-                Sign In
+                [ SIGN IN ]
               </Typography>
             </Typography>
           </Box>
-        </Paper>
+        </Box>
       </Container>
     </Box>
   );

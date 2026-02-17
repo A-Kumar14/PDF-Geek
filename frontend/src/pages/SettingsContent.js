@@ -3,22 +3,16 @@ import {
   TextField,
   Typography,
   Box,
-  Button,
   Divider,
-  Switch,
-  FormControlLabel,
-  Alert,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
 } from '@mui/material';
-import { useThemeMode } from '../theme/ThemeContext';
 import { useChatContext } from '../contexts/ChatContext';
 import { usePersona } from '../contexts/PersonaContext';
 
 export default function SettingsContent() {
-  const { mode, toggleMode } = useThemeMode();
   const { clearAllSessions } = useChatContext();
   const { personaId, selectPersona, personas } = usePersona();
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('filegeek-gemini-key') || '');
@@ -62,41 +56,50 @@ export default function SettingsContent() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>
-        Settings
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.1rem', color: '#E5E5E5', mb: 2 }}>
+        SETTINGS
       </Typography>
 
-      {saved && <Alert severity="success" sx={{ mb: 2 }}>Saved</Alert>}
+      {saved && (
+        <Box sx={{ border: '1px solid #00FF00', p: 1, mb: 2 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#00FF00' }}>
+            OK: SAVED
+          </Typography>
+        </Box>
+      )}
 
-      <Divider sx={{ my: 2 }} />
+      <Divider sx={{ borderColor: '#333333', my: 2 }} />
 
       {/* AI Persona */}
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        Default AI Persona
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#E5E5E5', mb: 0.5 }}>
+        {`// DEFAULT_PERSONA`}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
         Choose the personality FileGeek uses to respond.
       </Typography>
       <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-        <InputLabel>Persona</InputLabel>
+        <InputLabel sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>PERSONA</InputLabel>
         <Select
           value={personaId}
           onChange={(e) => selectPersona(e.target.value)}
-          label="Persona"
+          label="PERSONA"
+          sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
         >
           {personas.map((p) => (
-            <MenuItem key={p.id} value={p.id}>{p.label}</MenuItem>
+            <MenuItem key={p.id} value={p.id} sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+              {p.label.toUpperCase()}
+            </MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      <Divider sx={{ my: 3 }} />
+      <Divider sx={{ borderColor: '#333333', my: 3 }} />
 
       {/* Gemini API Key */}
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        Google Gemini API Key
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#E5E5E5', mb: 0.5 }}>
+        {`// GEMINI_API_KEY`}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
         Used when AI_PROVIDER=gemini. Get one from Google AI Studio.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
@@ -107,17 +110,35 @@ export default function SettingsContent() {
           placeholder="AIza..."
           value={geminiKey}
           onChange={(e) => setGeminiKey(e.target.value)}
+          InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
         />
-        <Button variant="contained" onClick={handleSaveGemini}>Save</Button>
+        <Box
+          onClick={handleSaveGemini}
+          sx={{
+            cursor: 'pointer',
+            border: '1px solid #333',
+            px: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            fontFamily: 'monospace',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: '#E5E5E5',
+            whiteSpace: 'nowrap',
+            '&:hover': { borderColor: '#00FF00', color: '#00FF00' },
+          }}
+        >
+          [ SAVE ]
+        </Box>
       </Box>
 
-      <Divider sx={{ my: 3 }} />
+      <Divider sx={{ borderColor: '#333333', my: 3 }} />
 
       {/* OpenAI API Key */}
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        OpenAI API Key
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#E5E5E5', mb: 0.5 }}>
+        {`// OPENAI_API_KEY`}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
         Used when AI_PROVIDER=openai, and required for text-to-speech.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
@@ -128,28 +149,35 @@ export default function SettingsContent() {
           placeholder="sk-..."
           value={openaiKey}
           onChange={(e) => setOpenaiKey(e.target.value)}
+          InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
         />
-        <Button variant="contained" onClick={handleSaveOpenai}>Save</Button>
+        <Box
+          onClick={handleSaveOpenai}
+          sx={{
+            cursor: 'pointer',
+            border: '1px solid #333',
+            px: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            fontFamily: 'monospace',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: '#E5E5E5',
+            whiteSpace: 'nowrap',
+            '&:hover': { borderColor: '#00FF00', color: '#00FF00' },
+          }}
+        >
+          [ SAVE ]
+        </Box>
       </Box>
 
-      <Divider sx={{ my: 3 }} />
-
-      {/* Appearance */}
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        Appearance
-      </Typography>
-      <FormControlLabel
-        control={<Switch checked={mode === 'dark'} onChange={toggleMode} />}
-        label={mode === 'dark' ? 'Dark Mode' : 'Light Mode'}
-      />
-
-      <Divider sx={{ my: 3 }} />
+      <Divider sx={{ borderColor: '#333333', my: 3 }} />
 
       {/* Notion Integration */}
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        Notion Integration
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#E5E5E5', mb: 0.5 }}>
+        {`// NOTION_INTEGRATION`}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
         Provide your Notion integration token to enable exporting to Notion.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
@@ -160,24 +188,51 @@ export default function SettingsContent() {
           placeholder="ntn_..."
           value={notionToken}
           onChange={(e) => setNotionToken(e.target.value)}
+          InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.8rem' } }}
         />
-        <Button variant="contained" onClick={handleSaveNotionToken}>Save</Button>
+        <Box
+          onClick={handleSaveNotionToken}
+          sx={{
+            cursor: 'pointer',
+            border: '1px solid #333',
+            px: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            fontFamily: 'monospace',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: '#E5E5E5',
+            whiteSpace: 'nowrap',
+            '&:hover': { borderColor: '#00FF00', color: '#00FF00' },
+          }}
+        >
+          [ SAVE ]
+        </Box>
       </Box>
 
-      <Divider sx={{ my: 3 }} />
+      <Divider sx={{ borderColor: '#333333', my: 3 }} />
 
       {/* Clear History */}
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        Data
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#E5E5E5', mb: 0.5 }}>
+        {`// DATA`}
       </Typography>
-      <Button
-        variant="outlined"
-        color="error"
+      <Box
         onClick={handleClearHistory}
-        sx={{ textTransform: 'none' }}
+        sx={{
+          cursor: 'pointer',
+          border: '1px solid #FF0000',
+          px: 1.5,
+          py: 1,
+          display: 'inline-block',
+          fontFamily: 'monospace',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          color: '#FF0000',
+          '&:hover': { bgcolor: '#FF0000', color: '#000' },
+        }}
       >
-        Clear All Chat History
-      </Button>
+        [ CLEAR ALL HISTORY ]
+      </Box>
     </Box>
   );
 }

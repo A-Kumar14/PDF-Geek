@@ -1,44 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Chip, alpha, useTheme } from '@mui/material';
-import { Lightbulb, BookOpen, Search, ListChecks, BrainCircuit } from 'lucide-react';
+import { Box, Typography } from '@mui/material';
 
 const DEFAULT_PROMPTS = [
-  { text: 'Summarize this document', icon: BookOpen },
-  { text: 'Explain the main concepts', icon: Lightbulb },
-  { text: 'Identify key takeaways', icon: Search },
+  { text: 'Summarize this document' },
+  { text: 'Explain the main concepts' },
+  { text: 'Identify key takeaways' },
 ];
 
 const EXTENDED_PROMPTS = [
-  { text: 'Create a study guide', icon: ListChecks },
-  { text: 'Find important definitions', icon: Search },
-  { text: 'Explain like I\'m a beginner', icon: BrainCircuit },
-  { text: 'List the main arguments', icon: ListChecks },
-  { text: 'What questions does this raise?', icon: Lightbulb },
+  { text: 'Create a study guide' },
+  { text: 'Find important definitions' },
+  { text: 'Explain like I\'m a beginner' },
+  { text: 'List the main arguments' },
+  { text: 'What questions does this raise?' },
 ];
 
-export default function SuggestedPrompts({ onPromptSelected, dynamicPrompts }) {
+export default function SuggestedPrompts({ onSelect, onPromptSelected, dynamicPrompts }) {
   const [prompts, setPrompts] = useState(DEFAULT_PROMPTS);
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
 
-  // Update prompts when dynamic suggestions arrive from AI responses
   useEffect(() => {
     if (dynamicPrompts && dynamicPrompts.length > 0) {
       const mapped = dynamicPrompts.map((p) => {
         const text = typeof p === 'string' ? p : p.text || p;
-        return { text, icon: Lightbulb };
+        return { text };
       });
       setPrompts(mapped.slice(0, 4));
     }
   }, [dynamicPrompts]);
 
-  // Rotate in a fresh default prompt after one is clicked
   const handleClick = (prompt) => {
-    onPromptSelected(prompt.text);
+    if (onSelect) onSelect(prompt.text);
+    if (onPromptSelected) onPromptSelected(prompt.text);
 
     setPrompts((prev) => {
       const remaining = prev.filter((p) => p.text !== prompt.text);
-      // Pick a replacement from the extended pool that isn't already showing
       const showing = new Set(remaining.map((p) => p.text));
       const replacement = EXTENDED_PROMPTS.find((p) => !showing.has(p.text));
       if (replacement) {
@@ -54,39 +49,32 @@ export default function SuggestedPrompts({ onPromptSelected, dynamicPrompts }) {
     <Box
       sx={{
         display: 'flex',
+        flexWrap: 'wrap',
         gap: 1,
-        overflowX: 'auto',
-        pb: 0.5,
-        scrollbarWidth: 'none',
-        '&::-webkit-scrollbar': { display: 'none' },
+        justifyContent: 'center',
+        px: 2,
       }}
     >
-      {prompts.map((prompt) => {
-        const Icon = prompt.icon;
-        return (
-          <Chip
-            key={prompt.text}
-            label={prompt.text}
-            icon={<Icon size={14} strokeWidth={2} />}
-            variant="outlined"
-            clickable
-            onClick={() => handleClick(prompt)}
-            aria-label={`Suggested prompt: ${prompt.text}`}
-            sx={{
-              flexShrink: 0,
-              fontSize: '0.8rem',
-              fontWeight: 500,
-              borderRadius: '20px',
-              bgcolor: isDark ? alpha('#fff', 0.04) : alpha('#000', 0.03),
-              borderColor: theme.palette.divider,
-              '&:hover': {
-                bgcolor: isDark ? alpha('#fff', 0.08) : alpha('#000', 0.06),
-              },
-              transition: 'all 0.15s',
-            }}
-          />
-        );
-      })}
+      {prompts.map((prompt) => (
+        <Box
+          key={prompt.text}
+          onClick={() => handleClick(prompt)}
+          sx={{
+            border: '1px solid #333333',
+            px: 2,
+            py: 1,
+            cursor: 'pointer',
+            '&:hover': {
+              borderColor: '#E5E5E5',
+              bgcolor: '#0D0D0D',
+            },
+          }}
+        >
+          <Typography sx={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>
+            {'> '}{prompt.text}
+          </Typography>
+        </Box>
+      ))}
     </Box>
   );
 }

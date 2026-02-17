@@ -8,13 +8,8 @@ import {
   ListItemIcon,
   ListItemText,
   Typography,
-  Chip,
-  alpha,
-  useTheme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
 import SettingsIcon from '@mui/icons-material/Settings';
 import HomeIcon from '@mui/icons-material/Home';
 import PersonIcon from '@mui/icons-material/Person';
@@ -25,7 +20,6 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import { useNavigate } from 'react-router-dom';
-import { useThemeMode } from '../theme/ThemeContext';
 import { usePersona } from '../contexts/PersonaContext';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
@@ -39,15 +33,12 @@ export default function CommandPalette() {
   const listRef = useRef(null);
 
   const navigate = useNavigate();
-  const theme = useTheme();
-  const { mode, toggleMode } = useThemeMode();
   const { personas, selectPersona } = usePersona();
   const { file, removeFile } = useFile();
   const { sendMessage, clearMessages, clearAllSessions } = useChatContext();
   const { toggleNotesPanel } = useHighlights();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Global CMD+K / Ctrl+K listener
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -62,95 +53,84 @@ export default function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open]);
 
-  // Build command list
   const commands = useMemo(() => {
     const cmds = [
       {
-        id: 'toggle-theme',
-        label: mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-        icon: mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />,
-        category: 'Appearance',
-        action: () => toggleMode(),
-      },
-      {
         id: 'settings',
-        label: 'Open Settings',
+        label: 'OPEN_SETTINGS',
         icon: <SettingsIcon fontSize="small" />,
-        category: 'Navigation',
+        category: 'NAVIGATION',
         action: () => navigate('/settings'),
       },
       {
         id: 'home',
-        label: 'Go Home',
+        label: 'GO_HOME',
         icon: <HomeIcon fontSize="small" />,
-        category: 'Navigation',
+        category: 'NAVIGATION',
         action: () => { removeFile(); clearMessages(); },
       },
       {
         id: 'clear-sessions',
-        label: 'Clear All Chat History',
+        label: 'CLEAR_ALL_HISTORY',
         icon: <DeleteSweepIcon fontSize="small" />,
-        category: 'Actions',
+        category: 'ACTIONS',
         action: () => clearAllSessions(),
       },
       {
         id: 'toggle-notes',
-        label: 'Toggle Research Notes',
+        label: 'TOGGLE_RESEARCH_NOTES',
         icon: <PushPinIcon fontSize="small" />,
-        category: 'Actions',
+        category: 'ACTIONS',
         action: () => toggleNotesPanel(),
       },
       {
         id: 'shortcuts',
-        label: 'Show Keyboard Shortcuts',
+        label: 'KEYBOARD_SHORTCUTS',
         icon: <KeyboardIcon fontSize="small" />,
-        category: 'Help',
+        category: 'HELP',
         action: () => setShowShortcuts(true),
       },
     ];
 
-    // File-specific commands
     if (file) {
       cmds.push(
         {
           id: 'summarize',
-          label: 'Summarize Document',
+          label: 'SUMMARIZE_DOCUMENT',
           icon: <SummarizeIcon fontSize="small" />,
-          category: 'AI Actions',
+          category: 'AI_ACTIONS',
           action: () => sendMessage('Summarize'),
         },
         {
           id: 'quiz',
-          label: 'Generate Quiz',
+          label: 'GENERATE_QUIZ',
           icon: <QuizIcon fontSize="small" />,
-          category: 'AI Actions',
+          category: 'AI_ACTIONS',
           action: () => sendMessage('Make Quiz'),
         },
         {
           id: 'remove-file',
-          label: 'Remove Current File',
+          label: 'REMOVE_CURRENT_FILE',
           icon: <UploadFileIcon fontSize="small" />,
-          category: 'Actions',
+          category: 'ACTIONS',
           action: () => { removeFile(); clearMessages(); },
         },
       );
     }
 
-    // Persona switchers
     personas.forEach((p) => {
       cmds.push({
         id: `persona-${p.id}`,
-        label: `Switch to ${p.label}`,
+        label: `SWITCH_TO_${p.label.toUpperCase().replace(/\s+/g, '_')}`,
         icon: <PersonIcon fontSize="small" />,
-        category: 'Personas',
+        category: 'PERSONAS',
         action: () => selectPersona(p.id),
       });
     });
 
     return cmds;
-  }, [mode, file, personas, toggleMode, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, toggleNotesPanel]);
+  }, [file, personas, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, toggleNotesPanel]);
 
-  // Filter commands by query
   const filtered = useMemo(() => {
     if (!query.trim()) return commands;
     const q = query.toLowerCase();
@@ -161,19 +141,11 @@ export default function CommandPalette() {
     );
   }, [commands, query]);
 
-  // Reset selection when query or open changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query, open]);
-
-  // Clear query on close
-  useEffect(() => {
-    if (!open) setQuery('');
-  }, [open]);
+  useEffect(() => { setSelectedIndex(0); }, [query, open]);
+  useEffect(() => { if (!open) setQuery(''); }, [open]);
 
   const executeCommand = useCallback((cmd) => {
     setOpen(false);
-    // Small delay so dialog closes first
     setTimeout(() => cmd.action(), 50);
   }, []);
 
@@ -190,7 +162,6 @@ export default function CommandPalette() {
     }
   }, [filtered, selectedIndex, executeCommand]);
 
-  // Scroll selected item into view
   useEffect(() => {
     if (listRef.current) {
       const items = listRef.current.querySelectorAll('[role="option"]');
@@ -198,202 +169,160 @@ export default function CommandPalette() {
     }
   }, [selectedIndex]);
 
-  const isDark = mode === 'dark';
-
   return (
     <>
-    <Dialog
-      open={open}
-      onClose={() => setOpen(false)}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: {
-          mt: '15vh',
-          mx: 'auto',
-          borderRadius: '16px',
-          backdropFilter: 'blur(24px) saturate(180%)',
-          backgroundColor: isDark
-            ? alpha('#1A1A2E', 0.85)
-            : alpha('#FFFFFF', 0.85),
-          border: `1px solid ${isDark
-            ? alpha('#E5E7EB', 0.08)
-            : alpha('#94A3B8', 0.2)}`,
-          boxShadow: isDark
-            ? '0 24px 80px rgba(0,0,0,0.5)'
-            : '0 24px 80px rgba(0,0,0,0.15)',
-          overflow: 'hidden',
-        },
-      }}
-      slotProps={{
-        backdrop: {
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
           sx: {
-            backgroundColor: alpha('#000', isDark ? 0.5 : 0.25),
-            backdropFilter: 'blur(4px)',
+            mt: '15vh',
+            mx: 'auto',
+            bgcolor: '#0D0D0D',
+            border: '1px solid #333333',
+            overflow: 'hidden',
           },
-        },
-      }}
-      TransitionProps={{ onEntered: () => inputRef.current?.focus() }}
-    >
-      {/* Search input */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.5,
-          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
-      >
-        <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-        <InputBase
-          inputRef={inputRef}
-          placeholder="Type a command..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          fullWidth
-          sx={{
-            fontSize: '0.95rem',
-            fontWeight: 500,
-            '& input::placeholder': { opacity: 0.5 },
-          }}
-        />
-        <Chip
-          label={navigator.platform?.includes('Mac') ? '\u2318K' : 'Ctrl+K'}
-          size="small"
-          variant="outlined"
-          sx={{
-            fontSize: '0.7rem',
-            fontWeight: 600,
-            height: 24,
-            borderColor: theme.palette.divider,
-            color: 'text.secondary',
-          }}
-        />
-      </Box>
-
-      {/* Command list */}
-      <List
-        ref={listRef}
-        dense
-        sx={{
-          maxHeight: 360,
-          overflow: 'auto',
-          py: 1,
-          px: 1,
+        slotProps={{
+          backdrop: {
+            sx: { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+          },
         }}
-        role="listbox"
+        TransitionProps={{ onEntered: () => inputRef.current?.focus() }}
       >
-        {filtered.length === 0 && (
-          <Box sx={{ py: 4, textAlign: 'center' }}>
-            <KeyboardIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 1 }} />
-            <Typography variant="body2" color="text.secondary">
-              No commands found
-            </Typography>
-          </Box>
-        )}
+        {/* Search input */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 2,
+            py: 1,
+            borderBottom: '1px solid #333333',
+          }}
+        >
+          <SearchIcon sx={{ color: '#888', fontSize: 18 }} />
+          <InputBase
+            inputRef={inputRef}
+            placeholder="TYPE_COMMAND..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            fullWidth
+            sx={{
+              fontSize: '0.85rem',
+              fontFamily: 'monospace',
+              fontWeight: 500,
+              color: '#E5E5E5',
+              '& input::placeholder': { color: '#666', opacity: 1 },
+            }}
+          />
+          <Typography sx={{ fontSize: '0.65rem', fontFamily: 'monospace', color: '#888', border: '1px solid #333', px: 0.75, py: 0.25 }}>
+            {navigator.platform?.includes('Mac') ? '\u2318K' : 'Ctrl+K'}
+          </Typography>
+        </Box>
 
-        {filtered.map((cmd, idx) => {
-          // Show category header when it changes
-          const showCategory =
-            idx === 0 || filtered[idx - 1].category !== cmd.category;
+        {/* Command list */}
+        <List
+          ref={listRef}
+          dense
+          sx={{ maxHeight: 360, overflow: 'auto', py: 0.5, px: 0.5 }}
+          role="listbox"
+        >
+          {filtered.length === 0 && (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <Typography sx={{ color: '#888', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                [NO_COMMANDS_FOUND]
+              </Typography>
+            </Box>
+          )}
 
-          return (
-            <React.Fragment key={cmd.id}>
-              {showCategory && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
+          {filtered.map((cmd, idx) => {
+            const showCategory = idx === 0 || filtered[idx - 1].category !== cmd.category;
+            return (
+              <React.Fragment key={cmd.id}>
+                {showCategory && (
+                  <Typography
+                    sx={{
+                      px: 1.5,
+                      pt: idx === 0 ? 0.5 : 1.5,
+                      pb: 0.5,
+                      display: 'block',
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      fontSize: '0.6rem',
+                      color: '#888',
+                    }}
+                  >
+                    {`// ${cmd.category}`}
+                  </Typography>
+                )}
+                <ListItemButton
+                  role="option"
+                  aria-selected={idx === selectedIndex}
+                  selected={idx === selectedIndex}
+                  onClick={() => executeCommand(cmd)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
                   sx={{
+                    py: 0.75,
                     px: 1.5,
-                    pt: idx === 0 ? 0.5 : 1.5,
-                    pb: 0.5,
-                    display: 'block',
-                    fontWeight: 600,
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                    fontSize: '0.65rem',
+                    mb: 0.25,
+                    borderLeft: idx === selectedIndex ? '2px solid #00FF00' : '2px solid transparent',
+                    '&.Mui-selected': {
+                      bgcolor: '#1A1A1A',
+                      '&:hover': { bgcolor: '#222' },
+                    },
+                    '&:hover': { bgcolor: '#1A1A1A' },
                   }}
                 >
-                  {cmd.category}
-                </Typography>
-              )}
-              <ListItemButton
-                role="option"
-                aria-selected={idx === selectedIndex}
-                selected={idx === selectedIndex}
-                onClick={() => executeCommand(cmd)}
-                onMouseEnter={() => setSelectedIndex(idx)}
-                sx={{
-                  borderRadius: '8px',
-                  py: 0.75,
-                  px: 1.5,
-                  mb: 0.25,
-                  transition: 'all 0.1s ease',
-                  '&.Mui-selected': {
-                    bgcolor: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.1),
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.14),
-                    },
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 32, color: 'text.secondary' }}>
-                  {cmd.icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={cmd.label}
-                  primaryTypographyProps={{
-                    variant: 'body2',
-                    fontWeight: 500,
-                    fontSize: '0.85rem',
-                  }}
-                />
-              </ListItemButton>
-            </React.Fragment>
-          );
-        })}
-      </List>
+                  <ListItemIcon sx={{ minWidth: 28, color: idx === selectedIndex ? '#00FF00' : '#888' }}>
+                    {cmd.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={cmd.label}
+                    primaryTypographyProps={{
+                      fontFamily: 'monospace',
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      color: idx === selectedIndex ? '#E5E5E5' : '#AAA',
+                    }}
+                  />
+                </ListItemButton>
+              </React.Fragment>
+            );
+          })}
+        </List>
 
-      {/* Footer hints */}
-      <Box
-        sx={{
-          display: 'flex',
-          gap: 2,
-          px: 2.5,
-          py: 1,
-          borderTop: `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        {[
-          { key: '\u2191\u2193', label: 'Navigate' },
-          { key: '\u21B5', label: 'Select' },
-          { key: 'Esc', label: 'Close' },
-        ].map(({ key, label }) => (
-          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Chip
-              label={key}
-              size="small"
-              variant="outlined"
-              sx={{
-                fontSize: '0.65rem',
-                fontWeight: 600,
-                height: 20,
-                minWidth: 24,
-                borderColor: theme.palette.divider,
-                color: 'text.secondary',
-                '& .MuiChip-label': { px: 0.75 },
-              }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-              {label}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
-    </Dialog>
+        {/* Footer hints */}
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 2,
+            px: 2,
+            py: 0.75,
+            borderTop: '1px solid #333333',
+          }}
+        >
+          {[
+            { key: '\u2191\u2193', label: 'NAV' },
+            { key: '\u21B5', label: 'SELECT' },
+            { key: 'ESC', label: 'CLOSE' },
+          ].map(({ key, label }) => (
+            <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography sx={{ fontSize: '0.6rem', fontFamily: 'monospace', color: '#888', border: '1px solid #333', px: 0.5 }}>
+                {key}
+              </Typography>
+              <Typography sx={{ fontSize: '0.6rem', fontFamily: 'monospace', color: '#666' }}>
+                {label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Dialog>
 
       {/* Keyboard Shortcuts Dialog */}
       <Dialog
@@ -402,28 +331,26 @@ export default function CommandPalette() {
         maxWidth="xs"
         fullWidth
         PaperProps={{
-          sx: {
-            borderRadius: '16px',
-            backdropFilter: 'blur(24px) saturate(180%)',
-            backgroundColor: isDark ? alpha('#1A1A2E', 0.9) : alpha('#FFFFFF', 0.9),
-          },
+          sx: { bgcolor: '#0D0D0D', border: '1px solid #333333' },
         }}
       >
         <Box sx={{ px: 3, py: 2 }}>
-          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
-            Keyboard Shortcuts
+          <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, mb: 2, color: '#E5E5E5', fontSize: '0.9rem' }}>
+            KEYBOARD_SHORTCUTS
           </Typography>
           {[
             { keys: navigator.platform?.includes('Mac') ? '\u2318K' : 'Ctrl+K', desc: 'Command palette' },
             { keys: 'Enter', desc: 'Send message' },
-            { keys: 'Shift+Enter', desc: 'New line in message' },
-            { keys: 'Esc', desc: 'Close dialogs / panels' },
-            { keys: '\u2190 \u2192', desc: 'Previous / next PDF page' },
-            { keys: '+  \u2212', desc: 'Zoom in / out PDF' },
+            { keys: 'Shift+Enter', desc: 'New line' },
+            { keys: 'Esc', desc: 'Close dialogs' },
+            { keys: '\u2190 \u2192', desc: 'Prev / next page' },
+            { keys: '+  \u2212', desc: 'Zoom in / out' },
           ].map(({ keys, desc }) => (
-            <Box key={desc} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.75 }}>
-              <Typography variant="body2" color="text.secondary">{desc}</Typography>
-              <Chip label={keys} size="small" variant="outlined" sx={{ fontSize: '0.72rem', fontWeight: 600, height: 24, borderColor: theme.palette.divider }} />
+            <Box key={desc} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #222' }}>
+              <Typography sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#888' }}>{desc}</Typography>
+              <Typography sx={{ fontSize: '0.7rem', fontFamily: 'monospace', color: '#E5E5E5', border: '1px solid #333', px: 0.75, py: 0.25 }}>
+                {keys}
+              </Typography>
             </Box>
           ))}
         </Box>

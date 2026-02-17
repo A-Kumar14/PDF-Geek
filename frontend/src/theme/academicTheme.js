@@ -1,135 +1,98 @@
-import { createTheme, alpha } from '@mui/material/styles';
+import { createTheme } from '@mui/material/styles';
 
-// ── Design tokens ──────────────────────────────────────────────────────
-// Linear-style dark mode: desaturated neutrals + indigo accent
-// Light mode: clean slate with same accent family
+// ── Brutalist Design Tokens ─────────────────────────────────────────
+// High-Contrast Technical Minimalism: black, monospace, zero ornamentation
 
-const getDesignTokens = (mode) => ({
-  palette: {
-    mode,
-    ...(mode === 'light'
-      ? {
-          primary: { main: '#5E6AD2', light: '#7B85DC', dark: '#4850A8' },
-          secondary: { main: '#6B7280' },
-          background: { default: '#F8F9FB', paper: '#FFFFFF' },
-          text: { primary: '#111827', secondary: '#6B7280' },
-          divider: alpha('#94A3B8', 0.2),
-          action: {
-            hover: alpha('#5E6AD2', 0.06),
-            selected: alpha('#5E6AD2', 0.1),
-          },
-        }
-      : {
-          primary: { main: '#5E6AD2', light: '#8B93E8', dark: '#4850A8' },
-          secondary: { main: '#9CA3AF' },
-          background: { default: '#121212', paper: '#1A1A2E' },
-          text: { primary: '#E5E7EB', secondary: '#9CA3AF' },
-          divider: alpha('#E5E7EB', 0.08),
-          action: {
-            hover: alpha('#5E6AD2', 0.1),
-            selected: alpha('#5E6AD2', 0.16),
-          },
-        }),
-  },
-  typography: {
-    fontFamily: "'Inter', 'Source Sans Pro', system-ui, -apple-system, sans-serif",
-    h4: { fontWeight: 700, letterSpacing: '-0.02em' },
-    h5: { fontWeight: 700, letterSpacing: '-0.01em' },
-    h6: { fontWeight: 600, letterSpacing: '-0.01em' },
-    body1: { lineHeight: 1.7 },
-    body2: { lineHeight: 1.6 },
-    button: { textTransform: 'none', fontWeight: 600, letterSpacing: '0.01em' },
-    overline: { letterSpacing: '0.08em', fontWeight: 600 },
-  },
-  shape: { borderRadius: 12 },
-});
+const COLORS = {
+  black: '#000000',
+  carbon: '#0D0D0D',
+  border: '#333333',
+  textPrimary: '#E5E5E5',
+  textSecondary: '#888888',
+  accent: '#00FF00',
+  error: '#FF0000',
+  dim: '#444444',
+};
 
-// ── Glassmorphism helpers ──────────────────────────────────────────────
-
-const glass = (mode) => ({
-  bg: mode === 'light'
-    ? alpha('#FFFFFF', 0.65)
-    : alpha('#1A1A2E', 0.6),
-  border: mode === 'light'
-    ? `1px solid ${alpha('#94A3B8', 0.15)}`
-    : `1px solid ${alpha('#E5E7EB', 0.06)}`,
-  blur: 'blur(16px) saturate(180%)',
-  shadow: mode === 'light'
-    ? '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04)'
-    : '0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.2)',
-});
-
-// ── Theme factory ──────────────────────────────────────────────────────
-
-export default function createAcademicTheme(mode) {
-  const tokens = getDesignTokens(mode);
-  const g = glass(mode);
-
-  const theme = createTheme({
-    ...tokens,
+export default function createAcademicTheme() {
+  return createTheme({
+    palette: {
+      mode: 'dark',
+      primary: { main: COLORS.accent, light: COLORS.accent, dark: '#00CC00' },
+      secondary: { main: COLORS.textSecondary },
+      background: { default: COLORS.black, paper: COLORS.carbon },
+      text: { primary: COLORS.textPrimary, secondary: COLORS.textSecondary },
+      divider: COLORS.border,
+      error: { main: COLORS.error },
+      action: {
+        hover: 'rgba(255, 255, 255, 0.05)',
+        selected: 'rgba(0, 255, 0, 0.1)',
+      },
+    },
+    typography: {
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+      h4: { fontWeight: 700, letterSpacing: '0.05em' },
+      h5: { fontWeight: 700, letterSpacing: '0.03em' },
+      h6: { fontWeight: 700, letterSpacing: '0.02em' },
+      body1: { lineHeight: 1.6 },
+      body2: { lineHeight: 1.5, fontSize: '0.875rem' },
+      button: { textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' },
+      caption: { letterSpacing: '0.05em', fontWeight: 500 },
+      overline: { letterSpacing: '0.1em', fontWeight: 700 },
+    },
+    shape: { borderRadius: 0 },
     components: {
       // ── Global baseline ──
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            background: mode === 'light'
-              ? '#F8F9FB'
-              : '#121212',
+            background: COLORS.black,
+            color: COLORS.textPrimary,
             minHeight: '100vh',
           },
-          // Better LaTeX rendering
-          '.katex': {
-            fontSize: '1.1em !important',
-            lineHeight: '1.8 !important',
-          },
-          '.math-display': {
-            overflowX: 'auto',
-            padding: '8px 0',
-          },
-          // Smooth scrollbars
-          '*::-webkit-scrollbar': { width: 6 },
-          '*::-webkit-scrollbar-track': { background: 'transparent' },
+          '*::-webkit-scrollbar': { width: 8 },
+          '*::-webkit-scrollbar-track': { background: COLORS.carbon },
           '*::-webkit-scrollbar-thumb': {
-            background: alpha(mode === 'light' ? '#000' : '#fff', 0.15),
-            borderRadius: 3,
+            background: COLORS.border,
+            border: `1px solid ${COLORS.black}`,
           },
           '*::-webkit-scrollbar-thumb:hover': {
-            background: alpha(mode === 'light' ? '#000' : '#fff', 0.25),
+            background: COLORS.textPrimary,
           },
         },
       },
 
-      // ── AppBar (glassmorphic) ──
+      // ── AppBar ──
       MuiAppBar: {
         styleOverrides: {
           root: {
-            backdropFilter: g.blur,
-            backgroundColor: g.bg,
-            border: g.border,
-            borderTop: 'none',
-            borderLeft: 'none',
-            borderRight: 'none',
+            backgroundColor: COLORS.black,
+            borderBottom: `1px solid ${COLORS.border}`,
             boxShadow: 'none',
+            backdropFilter: 'none',
           },
         },
       },
 
-      // ── Drawer (glassmorphic) ──
+      // ── Drawer ──
       MuiDrawer: {
         styleOverrides: {
           paper: {
-            backdropFilter: g.blur,
-            backgroundColor: g.bg,
-            borderRight: g.border,
+            backgroundColor: COLORS.black,
+            borderRight: `1px solid ${COLORS.border}`,
+            backdropFilter: 'none',
           },
         },
       },
 
-      // ── Paper (flat, no image background) ──
+      // ── Paper ──
       MuiPaper: {
         styleOverrides: {
           root: {
             backgroundImage: 'none',
+            backgroundColor: COLORS.carbon,
+            borderRadius: 0,
+            boxShadow: 'none',
           },
         },
       },
@@ -138,21 +101,31 @@ export default function createAcademicTheme(mode) {
       MuiButton: {
         styleOverrides: {
           root: {
-            borderRadius: 8,
+            borderRadius: 0,
             boxShadow: 'none',
             padding: '6px 16px',
-            transition: 'all 0.15s ease',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            transition: 'none',
             '&:hover': {
-              boxShadow: g.shadow,
-              transform: 'translateY(-1px)',
-            },
-            '&:active': {
-              transform: 'translateY(0)',
+              boxShadow: 'none',
+              transform: 'none',
+              backgroundColor: COLORS.border,
             },
           },
           contained: {
+            backgroundColor: COLORS.textPrimary,
+            color: COLORS.black,
             '&:hover': {
-              boxShadow: `0 4px 12px ${alpha('#5E6AD2', 0.3)}`,
+              backgroundColor: '#FFFFFF',
+            },
+          },
+          outlined: {
+            borderColor: COLORS.border,
+            color: COLORS.textPrimary,
+            '&:hover': {
+              borderColor: COLORS.textPrimary,
+              backgroundColor: 'transparent',
             },
           },
         },
@@ -162,29 +135,34 @@ export default function createAcademicTheme(mode) {
       MuiIconButton: {
         styleOverrides: {
           root: {
-            transition: 'all 0.15s ease',
+            borderRadius: 0,
+            transition: 'none',
+            color: COLORS.textSecondary,
             '&:hover': {
-              transform: 'scale(1.08)',
-              backgroundColor: tokens.palette.action?.hover,
+              transform: 'none',
+              backgroundColor: COLORS.border,
+              color: COLORS.textPrimary,
             },
           },
         },
       },
 
-      // ── Chip (micro-interaction) ──
+      // ── Chip ──
       MuiChip: {
         styleOverrides: {
           root: {
-            fontWeight: 500,
-            transition: 'all 0.15s ease',
+            borderRadius: 0,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            transition: 'none',
             '&:hover': {
-              transform: 'translateY(-1px)',
-              boxShadow: g.shadow,
+              transform: 'none',
+              boxShadow: 'none',
             },
           },
           outlined: {
             borderWidth: 1,
-            borderColor: tokens.palette.divider,
+            borderColor: COLORS.border,
           },
         },
       },
@@ -193,31 +171,31 @@ export default function createAcademicTheme(mode) {
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
+            fontFamily: "'JetBrains Mono', monospace",
             '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: tokens.palette.divider,
-              transition: 'border-color 0.2s ease',
+              borderColor: COLORS.border,
+              borderRadius: 0,
             },
             '&:hover .MuiOutlinedInput-notchedOutline': {
-              borderColor: alpha('#5E6AD2', 0.4),
+              borderColor: COLORS.textSecondary,
             },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-              borderColor: '#5E6AD2',
-              borderWidth: 1.5,
+              borderColor: COLORS.accent,
+              borderWidth: 1,
             },
           },
         },
       },
 
-      // ── Dialog / Modal (glassmorphic) ──
+      // ── Dialog ──
       MuiDialog: {
         styleOverrides: {
           paper: {
-            backdropFilter: g.blur,
-            backgroundColor: g.bg,
-            border: g.border,
-            boxShadow: mode === 'dark'
-              ? '0 24px 48px rgba(0,0,0,0.4)'
-              : '0 24px 48px rgba(0,0,0,0.12)',
+            backgroundColor: COLORS.carbon,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 0,
+            boxShadow: 'none',
+            backdropFilter: 'none',
           },
         },
       },
@@ -226,12 +204,16 @@ export default function createAcademicTheme(mode) {
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
-            backdropFilter: 'blur(8px)',
-            backgroundColor: mode === 'light'
-              ? alpha('#111827', 0.9)
-              : alpha('#1A1A2E', 0.95),
+            backgroundColor: COLORS.carbon,
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.textPrimary,
+            fontFamily: "'JetBrains Mono', monospace",
             fontSize: '0.75rem',
-            borderRadius: 6,
+            borderRadius: 0,
+            backdropFilter: 'none',
+          },
+          arrow: {
+            color: COLORS.border,
           },
         },
       },
@@ -240,8 +222,9 @@ export default function createAcademicTheme(mode) {
       MuiSelect: {
         styleOverrides: {
           root: {
+            fontFamily: "'JetBrains Mono', monospace",
             '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: tokens.palette.divider,
+              borderColor: COLORS.border,
             },
           },
         },
@@ -251,16 +234,130 @@ export default function createAcademicTheme(mode) {
       MuiMenu: {
         styleOverrides: {
           paper: {
-            backdropFilter: g.blur,
-            backgroundColor: g.bg,
-            border: g.border,
-            boxShadow: mode === 'dark'
-              ? '0 8px 32px rgba(0,0,0,0.4)'
-              : '0 8px 32px rgba(0,0,0,0.12)',
+            backgroundColor: COLORS.carbon,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 0,
+            boxShadow: 'none',
+            backdropFilter: 'none',
+          },
+        },
+      },
+
+      // ── MenuItem ──
+      MuiMenuItem: {
+        styleOverrides: {
+          root: {
+            fontFamily: "'JetBrains Mono', monospace",
+            borderRadius: 0,
+            '&.Mui-selected': {
+              backgroundColor: 'rgba(0, 255, 0, 0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 255, 0, 0.15)',
+              },
+            },
+            '&:hover': {
+              backgroundColor: COLORS.border,
+            },
+          },
+        },
+      },
+
+      // ── ListItemButton ──
+      MuiListItemButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 0,
+            transition: 'none',
+            '&.Mui-selected': {
+              backgroundColor: 'rgba(0, 255, 0, 0.1)',
+            },
+            '&:hover': {
+              backgroundColor: COLORS.border,
+            },
+          },
+        },
+      },
+
+      // ── Switch ──
+      MuiSwitch: {
+        styleOverrides: {
+          root: {
+            '& .MuiSwitch-switchBase.Mui-checked': {
+              color: COLORS.accent,
+            },
+            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+              backgroundColor: COLORS.accent,
+            },
+          },
+        },
+      },
+
+      // ── Badge ──
+      MuiBadge: {
+        styleOverrides: {
+          badge: {
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            borderRadius: 0,
+          },
+        },
+      },
+
+      // ── LinearProgress ──
+      MuiLinearProgress: {
+        styleOverrides: {
+          root: {
+            backgroundColor: COLORS.border,
+            borderRadius: 0,
+          },
+          bar: {
+            backgroundColor: COLORS.accent,
+            borderRadius: 0,
+          },
+        },
+      },
+
+      // ── Tabs ──
+      MuiTab: {
+        styleOverrides: {
+          root: {
+            fontFamily: "'JetBrains Mono', monospace",
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+          },
+        },
+      },
+
+      // ── Alert ──
+      MuiAlert: {
+        styleOverrides: {
+          root: {
+            borderRadius: 0,
+            border: `1px solid ${COLORS.border}`,
+          },
+        },
+      },
+
+      // ── Divider ──
+      MuiDivider: {
+        styleOverrides: {
+          root: {
+            borderColor: COLORS.border,
+          },
+        },
+      },
+
+      // ── TextField ──
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            '& .MuiInputBase-root': {
+              fontFamily: "'JetBrains Mono', monospace",
+            },
           },
         },
       },
     },
   });
-  return theme;
 }

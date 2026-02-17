@@ -1,9 +1,5 @@
 import React from 'react';
-import { Box, Typography, IconButton, Paper, Chip, Tooltip, alpha, useTheme } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
-import ReplayIcon from '@mui/icons-material/Replay';
+import { Box, Typography, Tooltip } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DOMPurify from 'dompurify';
@@ -30,22 +26,20 @@ function sanitize(content) {
 function relativeTime(ts) {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}d`;
 }
 
 export default function ResearchNotesPanel() {
   const { pinnedNotes, toggleNotesPanel, unpinNote, clearAllNotes } = useHighlights();
   const { sendMessage } = useChatContext();
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#000000' }}>
       {/* Header */}
       <Box
         sx={{
@@ -54,133 +48,102 @@ export default function ResearchNotesPanel() {
           justifyContent: 'space-between',
           px: 2,
           py: 1,
-          borderBottom: `1px solid ${theme.palette.divider}`,
+          borderBottom: '1px solid #333333',
         }}
       >
-        <Typography variant="subtitle2" fontWeight={700}>
-          Research Notes ({pinnedNotes.length})
+        <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.8rem', color: '#E5E5E5' }}>
+          RESEARCH_NOTES ({pinnedNotes.length})
         </Typography>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           {pinnedNotes.length > 0 && (
-            <Tooltip title="Clear all notes">
-              <IconButton size="small" onClick={clearAllNotes}>
-                <DeleteSweepIcon fontSize="small" />
-              </IconButton>
+            <Tooltip title="Clear all">
+              <Box onClick={clearAllNotes} sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 700, '&:hover': { color: '#FF0000' } }}>
+                [CLR]
+              </Box>
             </Tooltip>
           )}
-          <IconButton size="small" onClick={toggleNotesPanel}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
+          <Box onClick={toggleNotesPanel} sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 700, '&:hover': { color: '#E5E5E5' } }}>
+            [x]
+          </Box>
         </Box>
       </Box>
 
       {/* Body */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         {pinnedNotes.length === 0 ? (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              textAlign: 'center',
-              px: 3,
-            }}
-          >
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.12 : 0.08),
-                mb: 2.5,
-              }}
-            >
-              <PushPinIcon sx={{ fontSize: 28, color: 'primary.main' }} />
-            </Box>
-            <Typography variant="h6" fontWeight={700} sx={{ letterSpacing: '-0.01em', mb: 0.5 }}>
-              No notes yet
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', px: 2 }}>
+            <Typography sx={{ fontFamily: 'monospace', color: '#888', fontSize: '0.8rem', mb: 1 }}>
+              [NO_NOTES]
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 240, lineHeight: 1.6 }}>
-              Pin AI responses to save them here for quick reference across all your documents.
+            <Typography sx={{ fontFamily: 'monospace', color: '#555', fontSize: '0.7rem' }}>
+              Pin AI responses to save them here.
             </Typography>
           </Box>
         ) : (
           pinnedNotes.map((note) => (
-            <Paper
+            <Box
               key={note.id}
-              elevation={0}
               sx={{
-                p: 2,
-                borderRadius: 2,
-                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.05 : 0.03),
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                border: '1px solid #333333',
+                p: 1.5,
               }}
             >
-              {/* Top row: file chip + timestamp + unpin */}
+              {/* Top row */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 {note.fileName && (
-                  <Chip
-                    label={note.fileName.length > 25 ? note.fileName.slice(0, 22) + '...' : note.fileName}
-                    size="small"
-                    variant="outlined"
-                    sx={{ fontSize: '0.7rem', height: 22, borderRadius: '6px' }}
-                  />
+                  <Typography sx={{ fontSize: '0.65rem', fontFamily: 'monospace', color: '#888', border: '1px solid #333', px: 0.5 }}>
+                    {note.fileName.length > 20 ? note.fileName.slice(0, 17) + '...' : note.fileName}
+                  </Typography>
                 )}
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto', whiteSpace: 'nowrap' }}>
+                <Typography sx={{ ml: 'auto', fontSize: '0.6rem', fontFamily: 'monospace', color: '#555' }}>
                   {relativeTime(note.pinnedAt)}
                 </Typography>
+                <Tooltip title="Re-ask">
+                  <Box onClick={() => sendMessage(note.question)} sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700, '&:hover': { color: '#00FF00' } }}>
+                    [^]
+                  </Box>
+                </Tooltip>
                 <Tooltip title="Unpin">
-                  <IconButton size="small" onClick={() => unpinNote(note.id)} sx={{ ml: 0.5, p: 0.5 }}>
-                    <PushPinIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                  </IconButton>
+                  <Box onClick={() => unpinNote(note.id)} sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700, '&:hover': { color: '#FF0000' } }}>
+                    [x]
+                  </Box>
                 </Tooltip>
               </Box>
 
               {/* Question */}
               {note.question && (
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mb: 0.5 }}>
-                  <Typography
-                    variant="body2"
-                    fontWeight={600}
-                    sx={{
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                    }}
-                  >
-                    {note.question}
-                  </Typography>
-                  <Tooltip title="Re-ask this question" arrow>
-                    <IconButton
-                      size="small"
-                      onClick={() => sendMessage(note.question)}
-                      sx={{ p: 0.25, flexShrink: 0 }}
-                    >
-                      <ReplayIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
+                <Typography sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#E5E5E5',
+                  mb: 0.5,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                }}>
+                  {'> '}{note.question}
+                </Typography>
               )}
 
               {/* Answer */}
               <Box
                 sx={{
-                  '& p': { m: 0, fontSize: '0.85rem' },
-                  '& pre': { borderRadius: 1, p: 1, overflow: 'auto', bgcolor: 'background.default', fontSize: '0.8rem' },
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  color: '#AAA',
+                  lineHeight: 1.6,
+                  '& p': { m: 0, mb: 0.5 },
+                  '& pre': { p: 1, overflow: 'auto', bgcolor: '#0D0D0D', border: '1px solid #333', fontSize: '0.7rem' },
+                  '& code': { fontFamily: 'monospace', color: '#00FF00' },
                   '& table': {
                     borderCollapse: 'collapse',
                     width: '100%',
-                    '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5 },
+                    '& th, & td': { border: '1px solid #333', px: 1, py: 0.5, fontSize: '0.7rem' },
                   },
-                  maxHeight: 300,
+                  maxHeight: 200,
                   overflow: 'auto',
                 }}
               >
@@ -191,13 +154,13 @@ export default function ResearchNotesPanel() {
 
               {/* Sources */}
               {note.sources?.length > 0 && (
-                <Box sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+                <Box sx={{ mt: 1, pt: 0.5, borderTop: '1px solid #222' }}>
                   {note.sources.map((src, i) => (
                     <SmartCitation key={i} source={src} />
                   ))}
                 </Box>
               )}
-            </Paper>
+            </Box>
           ))
         )}
       </Box>

@@ -5,7 +5,7 @@ from app import app
 from services.pdf_service import PDFService
 from utils.validators import InputValidator
 
-class TestPDFGeek(unittest.TestCase):
+class TestFileGeek(unittest.TestCase):
     def setUp(self):
         self.app = app.test_client()
         self.app.testing = True

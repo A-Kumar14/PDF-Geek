@@ -1,21 +1,19 @@
 import React from 'react';
-import { Box, Skeleton, Typography } from '@mui/material';
+import { Box, Typography, LinearProgress } from '@mui/material';
 
 const PHASE_LABELS = {
-  reading: 'Reading document...',
-  analyzing: 'Analyzing Context...',
-  formulating: 'Formulating Answer...',
+  reading: 'READING_DOCUMENT...',
+  analyzing: 'ANALYZING_CONTEXT...',
+  formulating: 'FORMULATING_ANSWER...',
 };
 
 export default function SkeletonLoader({ phase }) {
   return (
-    <Box sx={{ px: 1, py: 0.5 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-        {PHASE_LABELS[phase] || 'Processing...'}
+    <Box sx={{ px: 1, py: 1 }}>
+      <Typography sx={{ color: '#888', fontFamily: 'monospace', fontSize: '0.75rem', mb: 1 }}>
+        [ {PHASE_LABELS[phase] || 'PROCESSING...'} ]
       </Typography>
-      <Skeleton variant="text" width="85%" />
-      <Skeleton variant="text" width="70%" />
-      <Skeleton variant="text" width="55%" />
+      <LinearProgress sx={{ bgcolor: '#333333', '& .MuiLinearProgress-bar': { bgcolor: '#00FF00' } }} />
     </Box>
   );
 }

@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-import { IconButton, Tooltip, Typography, alpha } from '@mui/material';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
-import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
+import { Box, Tooltip, Typography } from '@mui/material';
 import { sendFeedback } from '../api/sessions';
 
 export default function FeedbackButtons({ messageId }) {
@@ -26,43 +22,42 @@ export default function FeedbackButtons({ messageId }) {
   };
 
   return (
-    <>
-      <Tooltip title={feedback === 'up' ? 'Thanks!' : 'Helpful'} arrow>
-        <IconButton
-          size="small"
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Tooltip title={feedback === 'up' ? 'Recorded' : 'Helpful'}>
+        <Box
           onClick={() => handleFeedback('up')}
           sx={{
-            color: feedback === 'up' ? '#10B981' : 'text.secondary',
-            bgcolor: feedback === 'up' ? alpha('#10B981', 0.1) : 'transparent',
-            '&:hover': { bgcolor: alpha('#10B981', 0.1) },
-            p: 0.5,
+            cursor: 'pointer',
+            color: feedback === 'up' ? '#00FF00' : '#888',
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            '&:hover': { color: '#00FF00' },
           }}
         >
-          {feedback === 'up' ? <ThumbUpIcon sx={{ fontSize: 16 }} /> : <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />}
-        </IconButton>
+          [+]
+        </Box>
       </Tooltip>
-      <Tooltip title={feedback === 'down' ? 'Thanks!' : 'Not helpful'} arrow>
-        <IconButton
-          size="small"
+      <Tooltip title={feedback === 'down' ? 'Recorded' : 'Not helpful'}>
+        <Box
           onClick={() => handleFeedback('down')}
           sx={{
-            color: feedback === 'down' ? '#EF4444' : 'text.secondary',
-            bgcolor: feedback === 'down' ? alpha('#EF4444', 0.1) : 'transparent',
-            '&:hover': { bgcolor: alpha('#EF4444', 0.1) },
-            p: 0.5,
+            cursor: 'pointer',
+            color: feedback === 'down' ? '#FF0000' : '#888',
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            '&:hover': { color: '#FF0000' },
           }}
         >
-          {feedback === 'down' ? <ThumbDownIcon sx={{ fontSize: 16 }} /> : <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />}
-        </IconButton>
+          [-]
+        </Box>
       </Tooltip>
       {showThanks && (
-        <Typography
-          variant="caption"
-          sx={{ color: '#10B981', fontSize: '0.7rem', fontWeight: 600, animation: 'fadeIn 0.2s ease' }}
-        >
-          Thanks!
+        <Typography sx={{ color: '#00FF00', fontSize: '0.65rem', fontFamily: 'monospace' }}>
+          OK
         </Typography>
       )}
-    </>
+    </Box>
   );
 }

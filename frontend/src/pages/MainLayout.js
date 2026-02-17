@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button, Tab, Tabs, Dialog, DialogContent, useMediaQuery, useTheme } from '@mui/material';
+import { Box, Tab, Tabs, Dialog, DialogContent, useMediaQuery, useTheme } from '@mui/material';
 import TopBar from '../components/TopBar';
 import LeftDrawer from '../components/LeftDrawer';
 import ChatPanel from '../components/ChatPanel';
@@ -11,9 +11,7 @@ import ArtifactPanel from '../components/ArtifactPanel';
 import ResearchNotesPanel from '../components/ResearchNotesPanel';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
-import { usePersona } from '../contexts/PersonaContext';
 import { useHighlights } from '../contexts/HighlightsContext';
-import { useThemeMode } from '../theme/ThemeContext';
 
 const DRAWER_WIDTH = 260; // Slightly narrower for compactness
 const BORDER_COLOR = '#333333';
@@ -169,28 +167,27 @@ export default function MainLayout() {
                 </Box>
               )}
 
-              <Button
-                size="small"
+              <Box
                 onClick={handleRemoveFile}
                 sx={{
                   position: 'absolute',
                   top: files.length > 1 ? 48 : 12,
                   right: 12,
                   zIndex: 6,
-                  textTransform: 'uppercase',
-                  border: '1px solid #FF0000',
-                  color: '#FF0000',
-                  bgcolor: 'transparent',
-                  fontFamily: 'monospace',
-                  minWidth: 'auto',
+                  cursor: 'pointer',
+                  border: '1px solid #333',
+                  bgcolor: '#000',
                   px: 1,
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 0, 0, 0.1)',
-                  },
+                  py: 0.25,
+                  fontFamily: 'monospace',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: '#888',
+                  '&:hover': { borderColor: '#FF0000', color: '#FF0000' },
                 }}
               >
-                [ REMOVE ALL ]
-              </Button>
+                [x CLOSE]
+              </Box>
               <FileViewer file={file} fileType={fileType} targetPage={targetPage} onPageChange={reportPageChange} />
             </>
           ) : (

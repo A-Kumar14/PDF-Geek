@@ -96,10 +96,10 @@ function DrawerContent({ onClose }) {
       {/* Header Area */}
       <Box sx={{ p: 2, borderBottom: '1px solid #333333' }}>
         <Typography variant="h6" sx={{ color: '#E5E5E5', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'monospace' }}>
-          PDF-GEEK v2.0
+          FileGeek
         </Typography>
         <Typography variant="caption" sx={{ color: '#888888', fontFamily: 'monospace' }}>
-          SYSTEM READY
+          Your Study Sessions
         </Typography>
       </Box>
 

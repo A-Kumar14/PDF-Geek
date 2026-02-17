@@ -1,19 +1,11 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Box, TextField, IconButton, Typography, LinearProgress, Chip, alpha, useTheme } from '@mui/material';
+import { Box, TextField, IconButton, Typography, LinearProgress } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import TuneIcon from '@mui/icons-material/Tune';
 
 import { useChatContext } from '../contexts/ChatContext';
 import { useFile } from '../contexts/FileContext';
-import { usePersona } from '../contexts/PersonaContext';
-import { useHighlights } from '../contexts/HighlightsContext';
 
-import ChatMessage from './ChatMessage';
-import FileViewer from './FileViewer';
-import QuickActions from './QuickActions';
-import SkeletonLoader from './SkeletonLoader';
 import VoiceInput from './VoiceInput';
 import SuggestionChips from './SuggestionChips';
 import SuggestedPrompts from './SuggestedPrompts';
@@ -26,14 +18,9 @@ export default function ChatPanel() {
     addMessage,
     isLoading,
     streamingContent,
-    setStreamingContent,
-    setIsLoading,
     stopGeneration,
   } = useChatContext();
-  const { file, fileType } = useFile();
-  const { persona } = usePersona();
-  const { scrollToHighlight } = useHighlights();
-  const theme = useTheme();
+  const { file } = useFile();
 
   const [input, setInput] = useState('');
   const [showPrompts, setShowPrompts] = useState(true);

@@ -1,6 +1,5 @@
 import React from 'react';
-import { Chip, Tooltip } from '@mui/material';
-import ArticleIcon from '@mui/icons-material/Article';
+import { Box, Tooltip, Typography } from '@mui/material';
 import { useFile } from '../contexts/FileContext';
 
 export default function SmartCitation({ source }) {
@@ -16,16 +15,25 @@ export default function SmartCitation({ source }) {
     : '';
 
   return (
-    <Tooltip title={excerpt || `Source ${source.index}`} arrow>
-      <Chip
-        label={pageLabel}
-        size="small"
-        variant="outlined"
-        clickable
-        icon={<ArticleIcon fontSize="small" />}
+    <Tooltip title={excerpt || `Source ${source.index}`}>
+      <Box
         onClick={() => pages[0] && goToPage(pages[0])}
-        sx={{ mr: 0.5, mb: 0.5 }}
-      />
+        component="span"
+        sx={{
+          display: 'inline-block',
+          border: '1px solid #333333',
+          px: 0.75,
+          py: 0.25,
+          mr: 0.5,
+          mb: 0.5,
+          cursor: pages[0] ? 'pointer' : 'default',
+          '&:hover': pages[0] ? { borderColor: '#00FF00', color: '#00FF00' } : {},
+        }}
+      >
+        <Typography component="span" sx={{ fontSize: '0.65rem', fontFamily: 'monospace', color: '#888' }}>
+          [{pageLabel}]
+        </Typography>
+      </Box>
     </Tooltip>
   );
 }

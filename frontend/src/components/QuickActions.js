@@ -1,9 +1,5 @@
 import React from 'react';
-import { Box, Chip } from '@mui/material';
-import QuizIcon from '@mui/icons-material/Quiz';
-import SummarizeIcon from '@mui/icons-material/Summarize';
-import ImageSearchIcon from '@mui/icons-material/ImageSearch';
-import PersonIcon from '@mui/icons-material/Person';
+import { Box, Typography } from '@mui/material';
 import { useChatContext } from '../contexts/ChatContext';
 import { usePersona } from '../contexts/PersonaContext';
 import { useFile } from '../contexts/FileContext';
@@ -14,30 +10,31 @@ export default function QuickActions() {
   const { fileType } = useFile();
 
   const actions = [
-    { label: 'Make Quiz', icon: <QuizIcon fontSize="small" /> },
-    { label: 'Summarize', icon: <SummarizeIcon fontSize="small" /> },
-    ...(fileType === 'image'
-      ? [{ label: 'Analyze Image', icon: <ImageSearchIcon fontSize="small" /> }]
-      : []),
-    {
-      label: `Explain like ${persona.label}`,
-      icon: <PersonIcon fontSize="small" />,
-    },
+    'Make Quiz',
+    'Summarize',
+    ...(fileType === 'image' ? ['Analyze Image'] : []),
+    `Explain like ${persona.label}`,
   ];
 
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', mt: 2 }}>
-      {actions.map(({ label, icon }) => (
-        <Chip
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center', mt: 1 }}>
+      {actions.map((label) => (
+        <Box
           key={label}
-          label={label}
-          icon={icon}
-          variant="outlined"
-          clickable
-          disabled={loading}
-          onClick={() => sendMessage(label)}
-          sx={{ fontWeight: 500 }}
-        />
+          onClick={() => !loading && sendMessage(label)}
+          sx={{
+            border: '1px solid #333333',
+            px: 1.5,
+            py: 0.5,
+            cursor: loading ? 'default' : 'pointer',
+            opacity: loading ? 0.5 : 1,
+            '&:hover': loading ? {} : { borderColor: '#E5E5E5', bgcolor: '#0D0D0D' },
+          }}
+        >
+          <Typography sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#E5E5E5' }}>
+            {'> '}{label}
+          </Typography>
+        </Box>
       ))}
     </Box>
   );

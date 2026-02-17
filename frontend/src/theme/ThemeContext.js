@@ -1,33 +1,19 @@
-import React, { createContext, useState, useMemo, useContext, useEffect } from 'react';
+import React, { createContext, useMemo, useContext } from 'react';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import createAcademicTheme from './academicTheme';
 
-const ThemeContext = createContext({ mode: 'light', toggleMode: () => {} });
+const ThemeContext = createContext({ mode: 'dark', toggleMode: () => {} });
 
 export function useThemeMode() {
   return useContext(ThemeContext);
 }
 
 export function ThemeProviderWrapper({ children }) {
-  const [mode, setMode] = useState(
-    () => localStorage.getItem('filegeek-theme') || 'light'
-  );
+  const mode = 'dark';
+  const toggleMode = () => {}; // No-op: brutalist theme is dark-only
 
-  const toggleMode = () => {
-    setMode((prev) => {
-      const next = prev === 'light' ? 'dark' : 'light';
-      localStorage.setItem('filegeek-theme', next);
-      return next;
-    });
-  };
-
-  const theme = useMemo(() => createAcademicTheme(mode), [mode]);
-
-  // Sync 'dark' class to <html> for Tailwind dark: variants
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', mode === 'dark');
-  }, [mode]);
+  const theme = useMemo(() => createAcademicTheme(), []);
 
   return (
     <ThemeContext.Provider value={{ mode, toggleMode }}>

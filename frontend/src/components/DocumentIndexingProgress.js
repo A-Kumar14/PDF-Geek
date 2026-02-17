@@ -1,21 +1,19 @@
 import React from 'react';
-import { Box, LinearProgress, Typography, alpha, useTheme } from '@mui/material';
+import { Box, LinearProgress, Typography } from '@mui/material';
 
 const PHASE_LABELS = {
-  queued: 'Queued...',
-  pending: 'Queued...',
-  downloading: 'Downloading...',
-  extracting: 'Extracting text...',
-  indexing: 'Building index...',
-  completed: 'Complete',
-  success: 'Complete',
-  failure: 'Failed',
+  queued: 'QUEUED...',
+  pending: 'QUEUED...',
+  downloading: 'DOWNLOADING...',
+  extracting: 'EXTRACTING_TEXT...',
+  indexing: 'BUILDING_INDEX...',
+  completed: 'COMPLETE',
+  success: 'COMPLETE',
+  failure: 'FAILED',
 };
 
 export default function DocumentIndexingProgress({ phase, progress }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-  const label = PHASE_LABELS[phase] || 'Processing...';
+  const label = PHASE_LABELS[phase] || 'PROCESSING...';
   const isComplete = phase === 'completed' || phase === 'success';
   const isFailed = phase === 'failure';
 
@@ -24,27 +22,23 @@ export default function DocumentIndexingProgress({ phase, progress }) {
       sx={{
         width: '100%',
         px: 2,
-        py: 1.5,
-        borderRadius: '10px',
-        bgcolor: isFailed
-          ? alpha('#EF4444', isDark ? 0.1 : 0.06)
-          : alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05),
-        border: `1px solid ${
-          isFailed
-            ? alpha('#EF4444', 0.15)
-            : alpha(theme.palette.primary.main, 0.1)
-        }`,
+        py: 1,
+        border: `1px solid ${isFailed ? '#FF0000' : '#333333'}`,
+        bgcolor: '#0D0D0D',
       }}
     >
       <Typography
-        variant="caption"
-        color={isFailed ? 'error' : 'text.secondary'}
-        sx={{ fontWeight: 600, fontSize: '0.75rem' }}
+        sx={{
+          fontFamily: 'monospace',
+          fontWeight: 700,
+          fontSize: '0.75rem',
+          color: isFailed ? '#FF0000' : isComplete ? '#00FF00' : '#888',
+        }}
       >
-        {label}
+        [ {label} ]
       </Typography>
       <LinearProgress
-        variant={isComplete || isFailed ? 'determinate' : 'determinate'}
+        variant="determinate"
         value={progress}
         role="progressbar"
         aria-valuenow={progress}
@@ -53,16 +47,10 @@ export default function DocumentIndexingProgress({ phase, progress }) {
         aria-label={`Document indexing: ${label}`}
         sx={{
           mt: 0.5,
-          borderRadius: 3,
-          height: 6,
-          bgcolor: alpha(
-            isFailed ? '#EF4444' : theme.palette.primary.main,
-            0.1
-          ),
+          height: 4,
+          bgcolor: '#333333',
           '& .MuiLinearProgress-bar': {
-            borderRadius: 3,
-            bgcolor: isFailed ? '#EF4444' : undefined,
-            transition: 'transform 0.4s ease',
+            bgcolor: isFailed ? '#FF0000' : '#00FF00',
           },
         }}
       />

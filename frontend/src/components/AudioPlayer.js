@@ -1,7 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { IconButton, CircularProgress } from '@mui/material';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import StopIcon from '@mui/icons-material/Stop';
+import { Box, Tooltip } from '@mui/material';
 import apiClient from '../api/client';
 
 export default function AudioPlayer({ text }) {
@@ -42,14 +40,21 @@ export default function AudioPlayer({ text }) {
   if (!text) return null;
 
   return (
-    <IconButton size="small" onClick={handlePlay} disabled={loading} sx={{ ml: 0.5 }}>
-      {loading ? (
-        <CircularProgress size={16} />
-      ) : playing ? (
-        <StopIcon fontSize="small" />
-      ) : (
-        <VolumeUpIcon fontSize="small" />
-      )}
-    </IconButton>
+    <Tooltip title={playing ? 'Stop' : 'Read aloud'}>
+      <Box
+        onClick={loading ? undefined : handlePlay}
+        sx={{
+          cursor: loading ? 'default' : 'pointer',
+          color: playing ? '#00FF00' : '#888',
+          fontFamily: 'monospace',
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          opacity: loading ? 0.5 : 1,
+          '&:hover': loading ? {} : { color: '#E5E5E5' },
+        }}
+      >
+        {loading ? '[...]' : playing ? '[STOP]' : '[TTS]'}
+      </Box>
+    </Tooltip>
   );
 }

@@ -342,6 +342,11 @@ export function ChatProvider({ children }) {
         suggestions,
         setSuggestions,
         documentIndexing,
+        // Aliases and placeholders for ChatPanel compatibility
+        addMessage: sendMessage,
+        isLoading: loading,
+        streamingContent: null,
+        stopGeneration: () => {},
       }}
     >
       {children}

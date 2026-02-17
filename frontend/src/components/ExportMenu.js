@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-import { IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
-import ShareIcon from '@mui/icons-material/Share';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import DescriptionIcon from '@mui/icons-material/Description';
-import NoteIcon from '@mui/icons-material/Note';
+import { Box, Menu, MenuItem, ListItemText, Tooltip } from '@mui/material';
 import apiClient from '../api/client';
 
 export default function ExportMenu({ content, title }) {
@@ -75,21 +71,36 @@ export default function ExportMenu({ content, title }) {
 
   return (
     <>
-      <IconButton size="small" onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 0.5 }}>
-        <ShareIcon fontSize="small" />
-      </IconButton>
+      <Tooltip title="Export">
+        <Box
+          onClick={(e) => setAnchorEl(e.currentTarget)}
+          sx={{
+            cursor: 'pointer',
+            color: '#888',
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            '&:hover': { color: '#E5E5E5' },
+          }}
+        >
+          [EXP]
+        </Box>
+      </Tooltip>
       <Menu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)}>
         <MenuItem onClick={handleExportNotion}>
-          <ListItemIcon><CloudUploadIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Export to Notion</ListItemText>
+          <ListItemText primaryTypographyProps={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            {'> '}NOTION
+          </ListItemText>
         </MenuItem>
         <MenuItem onClick={handleExportMarkdown}>
-          <ListItemIcon><DescriptionIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Download as Markdown (Obsidian)</ListItemText>
+          <ListItemText primaryTypographyProps={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            {'> '}MARKDOWN
+          </ListItemText>
         </MenuItem>
         <MenuItem onClick={handleExportEnex}>
-          <ListItemIcon><NoteIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Download for Evernote (.enex)</ListItemText>
+          <ListItemText primaryTypographyProps={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            {'> '}EVERNOTE
+          </ListItemText>
         </MenuItem>
       </Menu>
     </>

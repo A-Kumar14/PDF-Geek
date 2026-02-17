@@ -1,14 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Box, IconButton, Tooltip, Typography, keyframes } from '@mui/material';
-import MicIcon from '@mui/icons-material/Mic';
-import MicOffIcon from '@mui/icons-material/MicOff';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-
-const pulse = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-`;
+import { Box, Tooltip, Typography } from '@mui/material';
 
 export default function VoiceInput({ onTranscript, disabled }) {
   const [isListening, setIsListening] = useState(false);
@@ -53,41 +44,46 @@ export default function VoiceInput({ onTranscript, disabled }) {
   }, []);
 
   const toggle = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
+    if (isListening) stopListening();
+    else startListening();
   };
 
-  // Check for browser support
   const supported = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   if (!supported) return null;
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      <Tooltip title={isListening ? 'Stop listening' : 'Voice input'} arrow>
-        <IconButton
-          size="small"
-          onClick={toggle}
-          disabled={disabled}
-          sx={{
-            color: isListening ? '#EF4444' : 'text.secondary',
-            animation: isListening ? `${pulse} 1.5s infinite` : 'none',
-            '&:hover': { color: isListening ? '#DC2626' : 'primary.main' },
-          }}
-        >
-          {isListening ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
-        </IconButton>
-      </Tooltip>
-      {isListening && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <FiberManualRecordIcon sx={{ fontSize: 8, color: '#EF4444', animation: 'recordingPulse 1s infinite' }} />
-          <Typography variant="caption" sx={{ color: '#EF4444', fontSize: '0.7rem', fontWeight: 600 }}>
-            Listening...
-          </Typography>
-        </Box>
-      )}
-    </Box>
+    <Tooltip title={isListening ? 'Stop listening' : 'Voice input'}>
+      <Box
+        onClick={disabled ? undefined : toggle}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          border: `1px solid ${isListening ? '#FF0000' : '#333333'}`,
+          px: 1,
+          py: 0.25,
+          cursor: disabled ? 'default' : 'pointer',
+          opacity: disabled ? 0.5 : 1,
+          '&:hover': disabled ? {} : { borderColor: isListening ? '#FF0000' : '#E5E5E5' },
+        }}
+      >
+        <Typography sx={{
+          fontSize: '0.7rem',
+          fontFamily: 'monospace',
+          fontWeight: 700,
+          color: isListening ? '#FF0000' : '#888',
+        }}>
+          {isListening ? '[ REC... ]' : '[ MIC ]'}
+        </Typography>
+        {isListening && (
+          <Box sx={{
+            width: 6,
+            height: 6,
+            bgcolor: '#FF0000',
+            animation: 'recordingPulse 1s infinite',
+          }} />
+        )}
+      </Box>
+    </Tooltip>
   );
 }

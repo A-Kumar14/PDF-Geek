@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Paper, IconButton, Tooltip, TextField, Box, Button } from '@mui/material';
-import HighlightIcon from '@mui/icons-material/Highlight';
-import StickyNote2Icon from '@mui/icons-material/StickyNote2';
-import CommentIcon from '@mui/icons-material/Comment';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import { Box, TextField, Tooltip } from '@mui/material';
 import { getSelectionBoundingRect } from '../utils/selectionUtils';
 import { useChatContext } from '../contexts/ChatContext';
 
@@ -23,18 +19,16 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
       return;
     }
 
-    const toolbarHeight = 44;
+    const toolbarHeight = 36;
     const margin = 8;
 
     let top = rect.top - toolbarHeight - margin;
     let left = rect.left + rect.width / 2;
 
-    // If not enough room above, show below
     if (top < margin) {
       top = rect.bottom + margin;
     }
 
-    // Clamp horizontal to viewport
     left = Math.max(100, Math.min(left, window.innerWidth - 100));
 
     setPosition({ top, left });
@@ -42,7 +36,6 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    // Small delay so the selection is finalized
     setTimeout(() => {
       const sel = window.getSelection();
       if (sel && sel.toString().trim().length > 0) {
@@ -72,7 +65,6 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
 
     const handleClickOutside = (e) => {
       if (toolbarRef.current && !toolbarRef.current.contains(e.target) && !commentMode) {
-        // Check if selection still exists
         const sel = window.getSelection();
         if (!sel || sel.toString().trim().length === 0) {
           dismiss();
@@ -114,10 +106,29 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
 
   if (!visible) return null;
 
+  const toolBtn = (label, onClick, color = '#888') => (
+    <Tooltip title={label}>
+      <Box
+        onClick={onClick}
+        sx={{
+          cursor: 'pointer',
+          color,
+          fontFamily: 'monospace',
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          px: 0.75,
+          py: 0.25,
+          '&:hover': { color: '#E5E5E5' },
+        }}
+      >
+        {label}
+      </Box>
+    </Tooltip>
+  );
+
   return createPortal(
-    <Paper
+    <Box
       ref={toolbarRef}
-      elevation={8}
       sx={{
         position: 'fixed',
         top: position.top,
@@ -126,59 +137,37 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
         zIndex: 1400,
         display: 'flex',
         alignItems: 'center',
-        gap: 0.5,
+        gap: 0.25,
         px: 0.5,
         py: 0.25,
-        borderRadius: '10px',
-        bgcolor: 'background.paper',
-        border: 1,
-        borderColor: 'divider',
+        bgcolor: '#0D0D0D',
+        border: '1px solid #333333',
       }}
     >
       {!commentMode ? (
         <>
-          <Tooltip title="Highlight" arrow>
-            <IconButton size="small" onClick={handleHighlight} sx={{ color: '#f59e0b' }}>
-              <HighlightIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Note" arrow>
-            <IconButton size="small" onClick={handleNote} sx={{ color: '#3b82f6' }}>
-              <StickyNote2Icon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Comment" arrow>
-            <IconButton size="small" onClick={handleCommentToggle} sx={{ color: '#8b5cf6' }}>
-              <CommentIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Ask AI about selection" arrow>
-            <IconButton
-              size="small"
-              onClick={() => {
-                const sel = window.getSelection();
-                const text = sel ? sel.toString().trim() : '';
-                if (text) {
-                  if (onAskAboutSelection) {
-                    onAskAboutSelection(text);
-                  } else if (sendMessage) {
-                    sendMessage(`Explain this passage: "${text}"`);
-                  }
-                }
-                dismiss();
-                sel?.removeAllRanges();
-              }}
-              sx={{ color: '#06b6d4' }}
-            >
-              <AutoAwesomeIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          {toolBtn('[HL]', handleHighlight, '#f59e0b')}
+          {toolBtn('[NOTE]', handleNote)}
+          {toolBtn('[CMT]', handleCommentToggle)}
+          {toolBtn('[AI?]', () => {
+            const sel = window.getSelection();
+            const text = sel ? sel.toString().trim() : '';
+            if (text) {
+              if (onAskAboutSelection) {
+                onAskAboutSelection(text);
+              } else if (sendMessage) {
+                sendMessage(`Explain this passage: "${text}"`);
+              }
+            }
+            dismiss();
+            sel?.removeAllRanges();
+          }, '#00FF00')}
         </>
       ) : (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, p: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, p: 0.25 }}>
           <TextField
             size="small"
-            placeholder="Add comment..."
+            placeholder="COMMENT..."
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             onKeyDown={(e) => {
@@ -188,14 +177,31 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
               }
             }}
             autoFocus
-            sx={{ width: 200, '& .MuiInputBase-input': { fontSize: '0.8rem', py: 0.5 } }}
+            sx={{
+              width: 180,
+              '& .MuiInputBase-input': {
+                fontSize: '0.75rem',
+                py: 0.5,
+                fontFamily: 'monospace',
+              },
+            }}
           />
-          <Button size="small" variant="contained" onClick={handleCommentSubmit} disabled={!commentText.trim()}>
-            Save
-          </Button>
+          <Box
+            onClick={commentText.trim() ? handleCommentSubmit : undefined}
+            sx={{
+              cursor: commentText.trim() ? 'pointer' : 'default',
+              color: commentText.trim() ? '#00FF00' : '#555',
+              fontFamily: 'monospace',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              '&:hover': commentText.trim() ? { color: '#E5E5E5' } : {},
+            }}
+          >
+            [OK]
+          </Box>
         </Box>
       )}
-    </Paper>,
+    </Box>,
     document.body
   );
 }
