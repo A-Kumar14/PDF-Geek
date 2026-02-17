@@ -106,3 +106,33 @@ class SessionDocument(db.Model):
             "page_count": self.page_count,
             "indexed_at": self.indexed_at.isoformat() if self.indexed_at else None,
         }
+
+
+class QuizResult(db.Model):
+    """Stores quiz completion results for progress tracking and analytics"""
+    __tablename__ = "quiz_results"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(36), db.ForeignKey("study_sessions.id"), nullable=False)
+    message_id = db.Column(db.Integer, db.ForeignKey("chat_messages.id"), nullable=False)
+    topic = db.Column(db.String(255), nullable=False)
+    score = db.Column(db.Integer, nullable=False)  # Number of correct answers
+    total_questions = db.Column(db.Integer, nullable=False)
+    answers_json = db.Column(db.Text, default="[]")  # User's selected answers
+    time_taken = db.Column(db.Integer, nullable=True)  # Time in seconds
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        import json
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "message_id": self.message_id,
+            "topic": self.topic,
+            "score": self.score,
+            "total_questions": self.total_questions,
+            "answers": json.loads(self.answers_json or "[]"),
+            "time_taken": self.time_taken,
+            "percentage": round((self.score / self.total_questions * 100), 1) if self.total_questions > 0 else 0,
+            "created_at": self.created_at.isoformat(),
+        }

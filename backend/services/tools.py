@@ -169,6 +169,7 @@ class ToolExecutor:
                 "artifact_type": "quiz",
                 "content": None,
                 "message": "No document content found to generate a quiz from.",
+                "interactive": True,
             }
 
         return {
@@ -176,7 +177,26 @@ class ToolExecutor:
             "context": context,
             "topic": topic,
             "num_questions": num_questions,
-            "instruction": f"Generate {num_questions} multiple-choice questions about '{topic}' based on this context. Format as JSON array with fields: question, options (array of 4), correct_index (0-3), explanation.",
+            "interactive": True,
+            "instruction": f"""Generate {num_questions} multiple-choice questions about '{topic}' based on the provided context.
+
+IMPORTANT: Return ONLY a valid JSON array with no additional text, markdown formatting, or code blocks.
+
+Each question object must have these exact fields:
+- question: (string) The question text
+- options: (array of exactly 4 strings) The answer choices
+- correct_index: (number 0-3) Index of the correct answer in the options array
+- explanation: (string) Brief explanation of why the answer is correct
+
+Example format:
+[
+  {{
+    "question": "What is X?",
+    "options": ["Choice A", "Choice B", "Choice C", "Choice D"],
+    "correct_index": 1,
+    "explanation": "Choice B is correct because..."
+  }}
+]""",
         }
 
     def _create_study_guide(self, args: dict, session_id: str, user_id: int) -> dict:
