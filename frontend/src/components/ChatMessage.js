@@ -1,20 +1,10 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Box, Paper, IconButton, Tooltip, Typography, Collapse, alpha, useTheme } from '@mui/material';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeKatex from 'rehype-katex';
+import React, { useState, useCallback, useRef, useMemo, Suspense } from 'react';
+import { Box, Tooltip, Typography, Collapse } from '@mui/material';
 import DOMPurify from 'dompurify';
-import 'katex/dist/katex.min.css';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CheckIcon from '@mui/icons-material/Check';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ReplayIcon from '@mui/icons-material/Replay';
 import SmartCitation from './SmartCitation';
+
+// Lazy-load MarkdownRenderer to reduce main bundle size by ~150KB
+const MarkdownRenderer = React.lazy(() => import('./MarkdownRenderer'));
 import AudioPlayer from './AudioPlayer';
 import ExportMenu from './ExportMenu';
 import FeedbackButtons from './FeedbackButtons';
@@ -23,7 +13,6 @@ import { useHighlights } from '../contexts/HighlightsContext';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
 
-// Copy-to-clipboard button for code blocks
 function CopyCodeButton({ code }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -34,29 +23,28 @@ function CopyCodeButton({ code }) {
     } catch { /* ignore */ }
   };
   return (
-    <Tooltip title={copied ? 'Copied!' : 'Copy code'} arrow>
-      <IconButton
-        size="small"
+    <Tooltip title={copied ? 'Copied' : 'Copy code'}>
+      <Box
         onClick={handleCopy}
         sx={{
           position: 'absolute',
           top: 4,
           right: 4,
-          color: 'text.secondary',
-          bgcolor: 'background.paper',
-          opacity: 0.7,
-          '&:hover': { opacity: 1, bgcolor: 'background.paper' },
-          p: 0.5,
+          cursor: 'pointer',
+          color: copied ? '#00FF00' : '#888',
+          fontFamily: 'monospace',
+          fontSize: '0.65rem',
+          fontWeight: 700,
           zIndex: 1,
+          '&:hover': { color: '#E5E5E5' },
         }}
       >
-        {copied ? <CheckIcon sx={{ fontSize: 14 }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
-      </IconButton>
+        {copied ? '[OK]' : '[CPY]'}
+      </Box>
     </Tooltip>
   );
 }
 
-// Custom pre renderer to wrap code blocks with copy button
 function CodeBlockWrapper({ children, ...props }) {
   const codeText = extractTextFromChildren(children);
   return (
@@ -74,7 +62,6 @@ function extractTextFromChildren(children) {
   return '';
 }
 
-// DOMPurify config: allow standard HTML + safe attributes, block data-attrs
 const PURIFY_CONFIG = {
   ALLOWED_TAGS: [
     'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li',
@@ -91,39 +78,38 @@ function sanitize(content) {
   return DOMPurify.sanitize(content, PURIFY_CONFIG);
 }
 
-// Threshold in pixels before we offer collapse
 const COLLAPSE_HEIGHT = 300;
 
 function relativeTime(ts) {
   if (!ts) return '';
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}d`;
 }
 
-export default function ChatMessage({ message, previousUserMessage }) {
-  const isUser = message.role === 'user';
-  const theme = useTheme();
-  const { pinNote, unpinNote, isNotePinned, getPinnedNoteByMessageId } = useHighlights();
-  const { file } = useFile();
-  const { sendMessage } = useChatContext();
-  const [expanded, setExpanded] = useState(true);
-  const [needsCollapse, setNeedsCollapse] = useState(false);
-  const [pinAnimating, setPinAnimating] = useState(false);
-  const contentRef = useRef(null);
+const ChatMessage = React.memo(
+  function ChatMessage({ message, previousUserMessage }) {
+    const isUser = message.role === 'user';
+    const { pinNote, unpinNote, isNotePinned, getPinnedNoteByMessageId } = useHighlights();
+    const { file } = useFile();
+    const { sendMessage } = useChatContext();
+    const [expanded, setExpanded] = useState(true);
+    const [needsCollapse, setNeedsCollapse] = useState(false);
+    const contentRef = useRef(null);
 
-  const isPinned = !isUser && isNotePinned(message.message_id);
+    const isPinned = !isUser && isNotePinned(message.message_id);
 
-  // Check if content exceeds collapse threshold after render
+    // Memoize sanitized content to avoid expensive DOMPurify calls on every render
+    const sanitizedContent = useMemo(() => sanitize(message.content), [message.content]);
+
   const measuredRef = useCallback((node) => {
     if (node && !isUser) {
       contentRef.current = node;
-      // Use requestAnimationFrame to measure after paint
       requestAnimationFrame(() => {
         if (node.scrollHeight > COLLAPSE_HEIGHT) {
           setNeedsCollapse(true);
@@ -138,8 +124,6 @@ export default function ChatMessage({ message, previousUserMessage }) {
       const note = getPinnedNoteByMessageId(message.message_id);
       if (note) unpinNote(note.id);
     } else {
-      setPinAnimating(true);
-      setTimeout(() => setPinAnimating(false), 400);
       pinNote({
         messageId: message.message_id,
         question: previousUserMessage?.content || '',
@@ -156,47 +140,54 @@ export default function ChatMessage({ message, previousUserMessage }) {
       role="listitem"
       aria-label={isUser ? 'Your message' : 'Assistant response'}
     >
-      <Paper
-        elevation={0}
+      <Box
         sx={{
-          maxWidth: '72%',
-          px: 2,
-          py: 1.2,
-          borderRadius: 3,
-          bgcolor: isUser ? 'primary.main' : 'action.hover',
-          color: isUser ? 'primary.contrastText' : 'text.primary',
-          '& p': { m: 0 },
+          maxWidth: '80%',
+          px: 1.5,
+          py: 1,
+          border: '1px solid #333333',
+          bgcolor: isUser ? '#1A1A1A' : '#0D0D0D',
+          fontFamily: 'monospace',
+          fontSize: '0.85rem',
+          color: '#E5E5E5',
+          '& p': { m: 0, mb: 0.5 },
           '& pre': {
-            borderRadius: 1,
-            p: 1.5,
+            p: 1,
             overflow: 'auto',
-            bgcolor: 'background.default',
-            fontSize: '0.85rem',
+            bgcolor: '#000000',
+            border: '1px solid #333',
+            fontSize: '0.8rem',
           },
+          '& code': { fontFamily: 'monospace', color: '#00FF00' },
           '& table': {
             borderCollapse: 'collapse',
             width: '100%',
-            '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1, py: 0.5 },
+            '& th, & td': { border: '1px solid #333', px: 1, py: 0.5, fontSize: '0.8rem' },
           },
+          '& a': { color: '#00FF00' },
           '& .math-display': { overflowX: 'auto' },
         }}
       >
+        {/* Role label */}
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#888', mb: 0.5, fontWeight: 700 }}>
+          {isUser ? '[ USER ]' : '[ SYS ]'}
+        </Typography>
+
         {isUser ? (
           <p style={{ margin: 0 }}>{message.content}</p>
         ) : message.isError ? (
           <Box>
-            <Typography variant="body2" color="error" sx={{ fontSize: '0.85rem' }}>
-              {message.content}
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#FF0000' }}>
+              ERROR: {message.content}
             </Typography>
             {message.failedQuestion && (
-              <Tooltip title="Retry this question" arrow>
-                <IconButton
-                  size="small"
+              <Tooltip title="Retry">
+                <Box
                   onClick={() => sendMessage(message.failedQuestion)}
-                  sx={{ mt: 0.5, color: 'primary.main' }}
+                  sx={{ cursor: 'pointer', color: '#888', fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 700, mt: 0.5, '&:hover': { color: '#00FF00' } }}
                 >
-                  <ReplayIcon sx={{ fontSize: 18 }} />
-                </IconButton>
+                  [RETRY]
+                </Box>
               </Tooltip>
             )}
           </Box>
@@ -204,89 +195,104 @@ export default function ChatMessage({ message, previousUserMessage }) {
           <>
             <Collapse in={expanded} collapsedSize={needsCollapse ? COLLAPSE_HEIGHT : undefined}>
               <Box ref={measuredRef}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeHighlight, rehypeKatex]}
-                  components={{ pre: CodeBlockWrapper }}
+                <Suspense
+                  fallback={
+                    <Box sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#888' }}>
+                      [ LOADING... ]
+                    </Box>
+                  }
                 >
-                  {sanitize(message.content)}
-                </ReactMarkdown>
+                  <MarkdownRenderer
+                    content={sanitizedContent}
+                    components={{ pre: CodeBlockWrapper }}
+                  />
+                </Suspense>
               </Box>
             </Collapse>
             {needsCollapse && (
               <Box
                 onClick={() => setExpanded((prev) => !prev)}
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
                   cursor: 'pointer',
+                  textAlign: 'center',
                   py: 0.5,
-                  color: 'primary.main',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  '&:hover': { textDecoration: 'underline' },
+                  color: '#00FF00',
+                  fontFamily: 'monospace',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  '&:hover': { color: '#E5E5E5' },
                 }}
               >
-                {expanded ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
-                {expanded ? 'Show less' : 'Show more'}
+                {expanded ? '[ LESS ]' : '[ MORE ]'}
               </Box>
             )}
             {message.sources?.length > 0 && (
-              <Box sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+              <Box sx={{ mt: 1, pt: 0.5, borderTop: '1px solid #222' }}>
                 {message.sources.map((src, i) => (
                   <SmartCitation key={i} source={src} />
                 ))}
               </Box>
             )}
-            {/* Suggestions */}
             {message.suggestions?.length > 0 && (
               <SuggestionChips suggestions={message.suggestions} />
             )}
-            {/* Actions: Pin + Feedback + Audio + Export */}
+            {/* Actions */}
             <Box
-              sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, pt: 0.5, borderTop: '1px solid #222' }}
               role="toolbar"
               aria-label="Message actions"
             >
-              <Tooltip title={isPinned ? 'Unpin from notes' : 'Pin to notes'}>
-                <IconButton
-                  size="small"
+              <Tooltip title={isPinned ? 'Unpin' : 'Pin to notes'}>
+                <Box
                   onClick={handleTogglePin}
                   sx={{
-                    color: isPinned ? 'primary.main' : 'text.secondary',
-                    bgcolor: isPinned ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.15),
-                    },
-                    p: 0.5,
+                    cursor: 'pointer',
+                    color: isPinned ? '#00FF00' : '#888',
+                    fontFamily: 'monospace',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    '&:hover': { color: '#E5E5E5' },
                   }}
                   aria-label={isPinned ? 'Unpin from research notes' : 'Pin to research notes'}
                 >
-                  {isPinned
-                    ? <PushPinIcon sx={{ fontSize: 18, animation: pinAnimating ? 'pinPulse 0.4s ease' : 'none' }} />
-                    : <PushPinOutlinedIcon sx={{ fontSize: 18 }} />}
-                </IconButton>
+                  {isPinned ? '[UNPIN]' : '[PIN]'}
+                </Box>
               </Tooltip>
               <FeedbackButtons messageId={message.message_id} />
               <AudioPlayer text={message.content} />
               <ExportMenu content={message.content} title="FileGeek Response" />
               {message.timestamp && (
-                <Typography variant="caption" color="text.disabled" sx={{ ml: 'auto', fontSize: '0.7rem' }}>
+                <Typography sx={{ ml: 'auto', fontFamily: 'monospace', fontSize: '0.6rem', color: '#555' }}>
                   {relativeTime(message.timestamp)}
                 </Typography>
               )}
             </Box>
           </>
         )}
-        {/* Timestamp for user messages */}
         {isUser && message.timestamp && (
-          <Typography variant="caption" color="inherit" sx={{ opacity: 0.6, fontSize: '0.65rem', mt: 0.25, display: 'block', textAlign: 'right' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#555', mt: 0.25, textAlign: 'right' }}>
             {relativeTime(message.timestamp)}
           </Typography>
         )}
-      </Paper>
+      </Box>
     </Box>
   );
-}
+  },
+  (prevProps, nextProps) => {
+    // Only re-render if message content, role, sources, timestamp, or error state changes
+    const prevMsg = prevProps.message;
+    const nextMsg = nextProps.message;
+    return (
+      prevMsg.content === nextMsg.content &&
+      prevMsg.role === nextMsg.role &&
+      prevMsg.message_id === nextMsg.message_id &&
+      prevMsg.timestamp === nextMsg.timestamp &&
+      prevMsg.isError === nextMsg.isError &&
+      JSON.stringify(prevMsg.sources) === JSON.stringify(nextMsg.sources) &&
+      JSON.stringify(prevMsg.suggestions) === JSON.stringify(nextMsg.suggestions) &&
+      prevProps.previousUserMessage?.content === nextProps.previousUserMessage?.content
+    );
+  }
+);
+
+export default ChatMessage;
