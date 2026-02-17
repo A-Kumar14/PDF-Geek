@@ -2,16 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { Box, IconButton, Tooltip, Divider, Typography, TextField } from '@mui/material';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import RotateLeftIcon from '@mui/icons-material/RotateLeft';
-import RotateRightIcon from '@mui/icons-material/RotateRight';
-import StickyNote2Icon from '@mui/icons-material/StickyNote2';
-import InvertColorsIcon from '@mui/icons-material/InvertColors';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { Box, Tooltip, Typography, TextField } from '@mui/material';
 import './PdfViewer.css';
 import HighlightLayer from './HighlightLayer';
 import SelectionToolbar from './SelectionToolbar';
@@ -20,6 +11,90 @@ import { useAnnotations } from '../contexts/AnnotationContext';
 import { getSelectionRectsRelativeTo } from '../utils/selectionUtils';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+/* ── Lazy thumbnail with IntersectionObserver ── */
+const LazyThumbnail = React.memo(
+  function LazyThumbnail({ pageNumber, isActive, onClick }) {
+    const ref = useRef(null);
+    const [hasRendered, setHasRendered] = useState(false);
+
+    useEffect(() => {
+      const el = ref.current;
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setHasRendered(true);
+            observer.disconnect();
+          }
+        },
+        { rootMargin: '100px 0px' }
+      );
+      observer.observe(el);
+      return () => observer.disconnect();
+    }, []);
+
+    // Auto-scroll active thumbnail into view
+    useEffect(() => {
+      if (isActive && ref.current) {
+        ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, [isActive]);
+
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={`pdf-thumb ${isActive ? 'active' : ''}`}
+        onClick={onClick}
+        aria-label={`Go to page ${pageNumber}`}
+      >
+        {hasRendered ? (
+          <Page
+            pageNumber={pageNumber}
+            width={150}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+          />
+        ) : (
+          <span className="pdf-thumb-placeholder">{pageNumber}</span>
+        )}
+        <span className="pdf-thumb-num">{pageNumber}</span>
+      </button>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Only re-render if pageNumber or isActive changes
+    return prevProps.pageNumber === nextProps.pageNumber && prevProps.isActive === nextProps.isActive;
+  }
+);
+
+/* ── Text-based toolbar button ── */
+function ToolBtn({ label, onClick, disabled, active, tooltip }) {
+  const btn = (
+    <Box
+      onClick={disabled ? undefined : onClick}
+      sx={{
+        cursor: disabled ? 'default' : 'pointer',
+        color: disabled ? '#555' : active ? '#00FF00' : '#888',
+        fontFamily: 'monospace',
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        px: 0.5,
+        userSelect: 'none',
+        '&:hover': disabled ? {} : { color: '#E5E5E5' },
+      }}
+    >
+      {label}
+    </Box>
+  );
+  return tooltip ? <Tooltip title={tooltip}>{btn}</Tooltip> : btn;
+}
+
+/* ── Vertical separator ── */
+function Sep() {
+  return <Box sx={{ width: '1px', height: 20, bgcolor: '#333333', mx: 0.25 }} />;
+}
 
 function PdfViewer({ file, targetPage, onPageChange }) {
   const [numPages, setNumPages] = useState(0);
@@ -44,7 +119,6 @@ function PdfViewer({ file, targetPage, onPageChange }) {
     URL.revokeObjectURL(url);
   }, [highlights, notes, comments, file]);
 
-  // Convert File object to ArrayBuffer for react-pdf
   const fileData = useMemo(() => {
     if (!file) return null;
     return file;
@@ -56,14 +130,12 @@ function PdfViewer({ file, targetPage, onPageChange }) {
     setRotation(0);
   }, []);
 
-  // Navigate to target page
   useEffect(() => {
     if (targetPage && targetPage >= 1 && targetPage <= numPages) {
       setPageNum(targetPage);
     }
   }, [targetPage, numPages]);
 
-  // Report page changes
   useEffect(() => {
     if (onPageChange) onPageChange(pageNum, numPages);
   }, [pageNum, numPages, onPageChange]);
@@ -92,8 +164,10 @@ function PdfViewer({ file, targetPage, onPageChange }) {
     });
   }, [scale, pageNum, addComment]);
 
+  const hasAnnotations = highlights.length > 0 || notes.length > 0 || comments.length > 0;
+
   if (!fileData) {
-    return <div className="placeholder">Upload a PDF to preview</div>;
+    return <div className="placeholder">[ NO_DOCUMENT ]</div>;
   }
 
   return (
@@ -103,32 +177,28 @@ function PdfViewer({ file, targetPage, onPageChange }) {
         onLoadSuccess={onDocumentLoadSuccess}
         loading={
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 4 }}>
-            <Typography color="text.secondary">Loading PDF...</Typography>
+            <Typography sx={{ fontFamily: 'monospace', color: '#888' }}>[ LOADING... ]</Typography>
           </Box>
         }
         error={
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 4 }}>
-            <Typography color="error">Failed to load PDF</Typography>
+            <Typography sx={{ fontFamily: 'monospace', color: '#FF0000' }}>ERROR: FAILED_TO_LOAD_PDF</Typography>
           </Box>
         }
       >
         {numPages > 0 && (
           <>
+            {/* ── Toolbar ── */}
             <header className="pdf-viewer-sticky-header">
-              <Box className="pdf-toolbar" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem 0.75rem', justifyContent: 'center' }}>
+              <Box className="pdf-toolbar">
+                {/* Page navigation */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Tooltip title="Previous page" arrow>
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Previous page"
-                        onClick={() => setPageNum(p => Math.max(p - 1, 1))}
-                        disabled={pageNum <= 1}
-                      >
-                        <ChevronLeftIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
+                  <ToolBtn
+                    label="[<]"
+                    onClick={() => setPageNum((p) => Math.max(p - 1, 1))}
+                    disabled={pageNum <= 1}
+                    tooltip="Previous page"
+                  />
                   <TextField
                     size="small"
                     value={pageInput || pageNum}
@@ -147,112 +217,92 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                       }
                     }}
                     onFocus={() => setPageInput(String(pageNum))}
-                    slotProps={{ input: { sx: { textAlign: 'center', fontSize: '0.8rem', py: 0.25, px: 0.5 } } }}
-                    sx={{ width: 44, '& .MuiOutlinedInput-root': { borderRadius: '6px' } }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          textAlign: 'center',
+                          fontSize: '0.8rem',
+                          fontFamily: 'monospace',
+                          py: 0.25,
+                          px: 0.5,
+                        },
+                      },
+                    }}
+                    sx={{ width: 44 }}
                     aria-label="Go to page"
                   />
-                  <Typography variant="body2" sx={{ opacity: 0.85, whiteSpace: 'nowrap' }}>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#888', whiteSpace: 'nowrap' }}>
                     / {numPages}
                   </Typography>
-                  <Tooltip title="Next page" arrow>
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label="Next page"
-                        onClick={() => setPageNum(p => Math.min(p + 1, numPages))}
-                        disabled={pageNum >= numPages}
-                      >
-                        <ChevronRightIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
+                  <ToolBtn
+                    label="[>]"
+                    onClick={() => setPageNum((p) => Math.min(p + 1, numPages))}
+                    disabled={pageNum >= numPages}
+                    tooltip="Next page"
+                  />
                 </Box>
 
-                <Divider orientation="vertical" flexItem />
+                <Sep />
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                  <Tooltip title="Zoom out" arrow>
-                    <IconButton size="small" aria-label="Zoom out" onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}>
-                      <ZoomOutIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Typography variant="body2" sx={{ opacity: 0.85, mx: 0.5, minWidth: 36, textAlign: 'center' }}>
+                {/* Zoom */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <ToolBtn
+                    label="[-]"
+                    onClick={() => setScale((s) => Math.max(s - 0.2, 0.5))}
+                    disabled={scale <= 0.5}
+                    tooltip="Zoom out"
+                  />
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#E5E5E5', minWidth: 36, textAlign: 'center' }}>
                     {Math.round(scale * 100)}%
                   </Typography>
-                  <Tooltip title="Zoom in" arrow>
-                    <IconButton size="small" aria-label="Zoom in" onClick={() => setScale(s => Math.min(s + 0.2, 3))}>
-                      <ZoomInIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                  <ToolBtn
+                    label="[+]"
+                    onClick={() => setScale((s) => Math.min(s + 0.2, 3))}
+                    disabled={scale >= 3}
+                    tooltip="Zoom in"
+                  />
                 </Box>
 
-                <Divider orientation="vertical" flexItem />
+                <Sep />
 
+                {/* Rotate */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                  <Tooltip title="Rotate left" arrow>
-                    <IconButton size="small" aria-label="Rotate left" onClick={() => setRotation(r => (r - 90 + 360) % 360)}>
-                      <RotateLeftIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Rotate right" arrow>
-                    <IconButton size="small" aria-label="Rotate right" onClick={() => setRotation(r => (r + 90) % 360)}>
-                      <RotateRightIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                  <ToolBtn label="[<R]" onClick={() => setRotation((r) => (r - 90 + 360) % 360)} tooltip="Rotate left" />
+                  <ToolBtn label="[R>]" onClick={() => setRotation((r) => (r + 90) % 360)} tooltip="Rotate right" />
                 </Box>
 
-                <Divider orientation="vertical" flexItem />
+                <Sep />
 
+                {/* Tools */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                  <Tooltip title="Notes" arrow>
-                    <IconButton size="small" aria-label="Open notes panel" onClick={() => setNotePanelOpen(true)} sx={{ color: '#f59e0b' }}>
-                      <StickyNote2Icon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title={darkFilter ? 'Normal view' : 'Dark reading mode'} arrow>
-                    <IconButton
-                      size="small"
-                      aria-label="Toggle dark reading filter"
-                      onClick={() => setDarkFilter((d) => !d)}
-                      sx={{ color: darkFilter ? 'primary.main' : 'text.secondary' }}
-                    >
-                      <InvertColorsIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  {(highlights.length > 0 || notes.length > 0 || comments.length > 0) && (
-                    <Tooltip title="Export annotations" arrow>
-                      <IconButton size="small" aria-label="Export annotations" onClick={handleExportAnnotations}>
-                        <FileDownloadIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                  <ToolBtn label="[NOTES]" onClick={() => setNotePanelOpen(true)} tooltip="Open notes" />
+                  <ToolBtn
+                    label="[INV]"
+                    onClick={() => setDarkFilter((d) => !d)}
+                    active={darkFilter}
+                    tooltip={darkFilter ? 'Normal view' : 'Dark reading mode'}
+                  />
+                  {hasAnnotations && (
+                    <ToolBtn label="[EXP]" onClick={handleExportAnnotations} tooltip="Export annotations" />
                   )}
                 </Box>
               </Box>
             </header>
 
             <div className="pdf-viewer-body">
-              {/* Thumbnail sidebar */}
+              {/* ── Thumbnail sidebar ── */}
               <aside className="pdf-thumbnails">
                 {Array.from({ length: numPages }, (_, i) => i + 1).map((n) => (
-                  <button
+                  <LazyThumbnail
                     key={n}
-                    type="button"
-                    className={`pdf-thumb ${pageNum === n ? 'active' : ''}`}
+                    pageNumber={n}
+                    isActive={pageNum === n}
                     onClick={() => setPageNum(n)}
-                    aria-label={`Go to page ${n}`}
-                  >
-                    <Page
-                      pageNumber={n}
-                      scale={0.15}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
-                    <span className="pdf-thumb-num">{n}</span>
-                  </button>
+                  />
                 ))}
               </aside>
 
-              {/* Main page view */}
+              {/* ── Main page view ── */}
               <div className="pdf-container">
                 <div
                   className="pdf-page-wrapper"
