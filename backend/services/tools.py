@@ -97,6 +97,34 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_flashcards",
+            "description": "Generate flashcards for spaced repetition study. Creates question-answer pairs based on document content. Returns a flashcard artifact.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "The topic or section to create flashcards about",
+                    },
+                    "num_cards": {
+                        "type": "integer",
+                        "description": "Number of flashcards to generate (default 10, max 20)",
+                        "default": 10,
+                    },
+                    "card_type": {
+                        "type": "string",
+                        "enum": ["definition", "concept", "fact", "mixed"],
+                        "description": "Type of flashcards to generate (default: mixed)",
+                        "default": "mixed",
+                    },
+                },
+                "required": ["topic"],
+            },
+        },
+    },
 ]
 
 # Gemini-compatible tool format
@@ -123,6 +151,7 @@ class ToolExecutor:
             "generate_quiz": self._generate_quiz,
             "create_study_guide": self._create_study_guide,
             "generate_visualization": self._generate_visualization,
+            "generate_flashcards": self._generate_flashcards,
         }.get(tool_name)
 
         if not handler:
@@ -237,4 +266,55 @@ Example format:
                           f"{'Use Mermaid diagram syntax wrapped in ```mermaid code block.' if viz_type == 'mermaid' else ''}"
                           f"{'Use a Markdown table.' if viz_type == 'table' else ''}"
                           f"{'Use a code block with appropriate language tag.' if viz_type == 'code' else ''}",
+        }
+
+    def _generate_flashcards(self, args: dict, session_id: str, user_id: int) -> dict:
+        topic = args.get("topic", "the document content")
+        num_cards = min(args.get("num_cards", 10), 20)
+        card_type = args.get("card_type", "mixed")
+
+        # Search for relevant content
+        result = self.rag_service.query(topic, session_id, user_id, n_results=8)
+        context = "\n\n".join(result.get("chunks", []))
+
+        if not context:
+            return {
+                "artifact_type": "flashcards",
+                "content": None,
+                "message": "No document content found to generate flashcards from.",
+            }
+
+        card_type_instructions = {
+            "definition": "Focus on term definitions and meanings.",
+            "concept": "Focus on explaining key concepts and theories.",
+            "fact": "Focus on specific facts, dates, and data points.",
+            "mixed": "Include a variety of definitions, concepts, and facts.",
+        }
+
+        return {
+            "artifact_type": "flashcards",
+            "context": context,
+            "topic": topic,
+            "num_cards": num_cards,
+            "card_type": card_type,
+            "instruction": f"""Generate {num_cards} flashcards about '{topic}' based on the provided context.
+{card_type_instructions.get(card_type, '')}
+
+IMPORTANT: Return ONLY a valid JSON array with no additional text, markdown formatting, or code blocks.
+
+Each flashcard object must have these exact fields:
+- front: (string) The question or prompt (keep concise, under 100 characters)
+- back: (string) The answer or explanation (can be longer, but clear and focused)
+- difficulty: (string) "easy", "medium", or "hard"
+- tags: (array of strings) 1-3 relevant tags for categorization
+
+Example format:
+[
+  {{
+    "front": "What is X?",
+    "back": "X is defined as...",
+    "difficulty": "medium",
+    "tags": ["concept", "fundamentals"]
+  }}
+]""",
         }

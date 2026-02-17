@@ -224,6 +224,347 @@ function QuizCard({ data }) {
   );
 }
 
+function FlashcardComponent({ data }) {
+  if (!data || !Array.isArray(data)) return null;
+  const cards = data;
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [cardStatus, setCardStatus] = useState(Array(cards.length).fill('remaining')); // 'remaining', 'reviewing', 'known'
+
+  const currentCard = cards[currentIndex];
+  const remainingCount = cardStatus.filter(s => s === 'remaining').length;
+  const reviewingCount = cardStatus.filter(s => s === 'reviewing').length;
+  const knownCount = cardStatus.filter(s => s === 'known').length;
+
+  const handleFlip = () => {
+    setFlipped(!flipped);
+  };
+
+  const handleNext = () => {
+    if (currentIndex < cards.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setFlipped(false);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+      setFlipped(false);
+    }
+  };
+
+  const handleMarkStatus = (status) => {
+    const newStatus = [...cardStatus];
+    newStatus[currentIndex] = status;
+    setCardStatus(newStatus);
+
+    // Auto-advance to next card
+    if (currentIndex < cards.length - 1) {
+      setTimeout(() => {
+        setCurrentIndex(currentIndex + 1);
+        setFlipped(false);
+      }, 300);
+    }
+  };
+
+  const handleReset = () => {
+    setCurrentIndex(0);
+    setFlipped(false);
+    setCardStatus(Array(cards.length).fill('remaining'));
+  };
+
+  if (cards.length === 0) {
+    return (
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#888', textAlign: 'center', p: 2 }}>
+        No flashcards available
+      </Typography>
+    );
+  }
+
+  const currentStatus = cardStatus[currentIndex];
+  const statusColor = {
+    remaining: '#888',
+    reviewing: '#FFAA00',
+    known: '#00FF00',
+  }[currentStatus];
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Progress bar */}
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Box sx={{ flex: 1, height: 6, bgcolor: '#1A1A1A', border: '1px solid #333', overflow: 'hidden', display: 'flex' }}>
+          <Box sx={{ width: `${(knownCount / cards.length) * 100}%`, bgcolor: '#00FF00', transition: 'width 0.3s' }} />
+          <Box sx={{ width: `${(reviewingCount / cards.length) * 100}%`, bgcolor: '#FFAA00', transition: 'width 0.3s' }} />
+        </Box>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', whiteSpace: 'nowrap' }}>
+          {currentIndex + 1}/{cards.length}
+        </Typography>
+      </Box>
+
+      {/* Status legend */}
+      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', fontSize: '0.7rem', fontFamily: 'monospace' }}>
+        <Box sx={{ color: '#888' }}>⬜ Remaining: {remainingCount}</Box>
+        <Box sx={{ color: '#FFAA00' }}>🔶 Reviewing: {reviewingCount}</Box>
+        <Box sx={{ color: '#00FF00' }}>✓ Known: {knownCount}</Box>
+      </Box>
+
+      {/* Flashcard */}
+      <Box
+        onClick={handleFlip}
+        sx={{
+          position: 'relative',
+          height: 280,
+          cursor: 'pointer',
+          perspective: '1000px',
+          '&:hover .flip-hint': { opacity: 0.7 },
+        }}
+      >
+        <Box
+          sx={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            transformStyle: 'preserve-3d',
+            transition: 'transform 0.6s',
+            transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          }}
+        >
+          {/* Front of card */}
+          <Box
+            sx={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              backfaceVisibility: 'hidden',
+              border: `2px solid ${statusColor}`,
+              bgcolor: '#0D0D0D',
+              p: 3,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography
+              sx={{
+                fontFamily: 'monospace',
+                fontSize: '1rem',
+                fontWeight: 700,
+                color: '#E5E5E5',
+                textAlign: 'center',
+                wordBreak: 'break-word',
+              }}
+            >
+              {currentCard.front}
+            </Typography>
+            <Typography
+              className="flip-hint"
+              sx={{
+                fontFamily: 'monospace',
+                fontSize: '0.65rem',
+                color: '#555',
+                mt: 2,
+                opacity: 0.5,
+                transition: 'opacity 0.3s',
+              }}
+            >
+              [CLICK TO FLIP]
+            </Typography>
+            {currentCard.difficulty && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  fontFamily: 'monospace',
+                  fontSize: '0.65rem',
+                  color: '#666',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {currentCard.difficulty}
+              </Box>
+            )}
+          </Box>
+
+          {/* Back of card */}
+          <Box
+            sx={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              backfaceVisibility: 'hidden',
+              transform: 'rotateY(180deg)',
+              border: `2px solid ${statusColor}`,
+              bgcolor: '#0D0D0D',
+              p: 3,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography
+              sx={{
+                fontFamily: 'monospace',
+                fontSize: '0.85rem',
+                color: '#E5E5E5',
+                textAlign: 'center',
+                wordBreak: 'break-word',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {currentCard.back}
+            </Typography>
+            {currentCard.tags && currentCard.tags.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 0.5, mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {currentCard.tags.map((tag, i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.6rem',
+                      color: '#666',
+                      border: '1px solid #333',
+                      px: 0.75,
+                      py: 0.25,
+                    }}
+                  >
+                    #{tag}
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Knowledge buttons (show when flipped) */}
+      {flipped && (
+        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+          <Button
+            onClick={(e) => { e.stopPropagation(); handleMarkStatus('reviewing'); }}
+            sx={{
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: '#FFAA00',
+              border: '1px solid #FFAA00',
+              px: 2,
+              py: 0.5,
+              '&:hover': {
+                bgcolor: '#1A1A00',
+                borderColor: '#FFAA00',
+              },
+            }}
+          >
+            [REVIEW]
+          </Button>
+          <Button
+            onClick={(e) => { e.stopPropagation(); handleMarkStatus('known'); }}
+            sx={{
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: '#00FF00',
+              border: '1px solid #00FF00',
+              px: 2,
+              py: 0.5,
+              '&:hover': {
+                bgcolor: '#001A00',
+                borderColor: '#00FF00',
+              },
+            }}
+          >
+            [KNOW IT]
+          </Button>
+        </Box>
+      )}
+
+      {/* Navigation controls */}
+      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Button
+          onClick={handlePrev}
+          disabled={currentIndex === 0}
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: currentIndex === 0 ? '#333' : '#888',
+            border: `1px solid ${currentIndex === 0 ? '#222' : '#333'}`,
+            minWidth: 60,
+            py: 0.5,
+            '&:hover': currentIndex === 0 ? {} : {
+              color: '#E5E5E5',
+              borderColor: '#666',
+            },
+          }}
+        >
+          [&lt;]
+        </Button>
+        <Button
+          onClick={handleReset}
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: '#888',
+            border: '1px solid #333',
+            px: 1.5,
+            py: 0.5,
+            '&:hover': {
+              color: '#E5E5E5',
+              borderColor: '#666',
+            },
+          }}
+        >
+          [RESET]
+        </Button>
+        <Button
+          onClick={handleNext}
+          disabled={currentIndex === cards.length - 1}
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: currentIndex === cards.length - 1 ? '#333' : '#888',
+            border: `1px solid ${currentIndex === cards.length - 1 ? '#222' : '#333'}`,
+            minWidth: 60,
+            py: 0.5,
+            '&:hover': currentIndex === cards.length - 1 ? {} : {
+              color: '#E5E5E5',
+              borderColor: '#666',
+            },
+          }}
+        >
+          [&gt;]
+        </Button>
+      </Box>
+
+      {/* Completion message */}
+      {knownCount === cards.length && (
+        <Box
+          sx={{
+            border: '2px solid #00FF00',
+            p: 2,
+            textAlign: 'center',
+            bgcolor: '#001A00',
+          }}
+        >
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: '#00FF00' }}>
+            ✓ ALL CARDS MASTERED!
+          </Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mt: 0.5 }}>
+            Great job! You've completed all {cards.length} flashcards.
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 function ArtifactRenderer({ artifact }) {
   const type = artifact.artifact_type || artifact.viz_type || 'unknown';
 
@@ -235,6 +576,15 @@ function ArtifactRenderer({ artifact }) {
     try {
       const data = typeof artifact.content === 'string' ? JSON.parse(artifact.content) : artifact.content;
       return <QuizCard data={data} />;
+    } catch {
+      return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>{artifact.content}</pre>;
+    }
+  }
+
+  if (type === 'flashcards' && artifact.content) {
+    try {
+      const data = typeof artifact.content === 'string' ? JSON.parse(artifact.content) : artifact.content;
+      return <FlashcardComponent data={data} />;
     } catch {
       return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>{artifact.content}</pre>;
     }
