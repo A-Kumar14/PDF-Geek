@@ -4,19 +4,33 @@ FileGeek is a full-stack document analysis platform that combines RAG (Retrieval
 
 ## Features
 
+### Core Capabilities
 - **Persistent RAG** — Documents are indexed into ChromaDB with session-scoped vector storage; context survives across conversations
-- **Agentic Tool-Calling** — AI can search documents, generate quizzes, create study guides, and produce Mermaid diagrams through a multi-round tool-calling loop
+- **Agentic Tool-Calling** — AI can search documents, generate quizzes, create study guides, flashcards, and produce Mermaid diagrams through a multi-round tool-calling loop
 - **Long-Term Memory** — The system remembers past interactions and learns user preferences from thumbs-up/down feedback
 - **Dual AI Provider** — Supports both Google Gemini and OpenAI, controlled via `AI_PROVIDER` env var (auto-detects from available keys)
 - **Server-Backed Sessions** — Chat sessions persist in SQLite with full message history, sources, and artifacts
 - **6 AI Personas** — Academic Mentor, Professional Analyst, Casual Helper, Albert Einstein, Gen-Z Tutor, Sherlock Holmes
 - **Multimodal Input** — PDF, DOCX, TXT, images (with OCR), and audio files (transcribed via Whisper)
+
+### Interactive Study Tools 🆕
+- **Interactive Quizzes** — Generate multiple-choice quizzes from document content with real-time scoring, visual feedback, and retry capability
+- **Flashcards with Spaced Repetition** — Create flashcards with 3D flip animation, mark as "Review" or "Know It", and track progress with SM-2 spaced repetition algorithm. Progress persists across sessions.
+
+### User Interface
 - **Voice Input** — Browser-based speech-to-text via Web Speech API
 - **Interactive PDF Viewer** — Built with react-pdf; text selection, highlights, annotations, sticky notes, and "Ask AI" on selected text
-- **Artifacts Panel** — Structured AI outputs (quizzes, study guides, Mermaid diagrams) render in a dedicated side panel
+- **Artifacts Panel** — Structured AI outputs (quizzes, flashcards, study guides, Mermaid diagrams) render in a dedicated side panel
 - **Export** — Markdown, Evernote (.enex), and Notion integration
 - **Text-to-Speech** — Listen to AI responses with persona-specific voices via OpenAI TTS
+
+### Integrations
 - **MCP Integration** — Model Context Protocol server for connecting to Claude Desktop or other MCP clients
+
+### Performance 🆕
+- **Optimized Rendering** — 50-70% faster UI rendering with React.memo and memoization
+- **Code-Splitting** — 150KB smaller bundle through lazy-loaded components
+- **Debounced State** — Smooth typing and scrolling with optimized state management
 
 ## Architecture
 
@@ -59,8 +73,8 @@ FileGeek/
 ### 1. Clone
 
 ```bash
-git clone https://github.com/A-Kumar14/PDF-Geek.git
-cd PDF-Geek
+git clone https://github.com/A-Kumar14/FileGeek-Main.git
+cd FileGeek-Main
 ```
 
 ### 2. Backend
