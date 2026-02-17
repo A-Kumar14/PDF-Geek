@@ -18,7 +18,7 @@ python-docx==1.1.2
 pytesseract==0.3.13
 
 # AI — dual-provider (set AI_PROVIDER=gemini or openai in .env)
-google-generativeai>=0.8.0
+google-generativeai>=0.3.0
 openai==1.95.1
 
 # Environment and configuration
@@ -36,7 +36,7 @@ langchain==0.3.25
 langchain-core>=0.3.58
 langchain-text-splitters==0.3.8
 langchain-openai==0.3.12
-langchain-google-genai==2.1.4
+langchain-google-genai>=2.0.0
 langchain-chroma==0.2.4
 
 # MCP (Model Context Protocol)
