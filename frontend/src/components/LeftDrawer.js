@@ -1,34 +1,52 @@
 import React, { useState } from 'react';
+import { Drawer } from '@mui/material';
 import {
-  Box,
-  Typography,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Collapse,
-  Drawer,
-} from '@mui/material';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import DescriptionIcon from '@mui/icons-material/Description';
-import FolderIcon from '@mui/icons-material/Folder';
-import ImageIcon from '@mui/icons-material/Image';
-import LogoutIcon from '@mui/icons-material/Logout';
-import HomeIcon from '@mui/icons-material/Home';
-import SearchIcon from '@mui/icons-material/Search';
+  Search,
+  Upload,
+  Home,
+  LogOut,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Folder,
+  Image,
+  File,
+} from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
 import { useFile } from '../contexts/FileContext';
 import { useNavigate } from 'react-router-dom';
 
 const SECTIONS = [
-  { key: 'all', label: 'ALL FILES', icon: <FolderIcon fontSize="small" />, types: [] }, // Empty types = all
-  { key: 'pdf', label: 'PDFs', icon: <DescriptionIcon fontSize="small" />, types: ['pdf'] },
-  { key: 'image', label: 'IMAGES', icon: <ImageIcon fontSize="small" />, types: ['image'] },
-  { key: 'document', label: 'DOCS', icon: <DescriptionIcon fontSize="small" />, types: ['docx', 'txt'] },
+  { key: 'all', label: 'ALL FILES', icon: Folder, types: [] },
+  { key: 'pdf', label: 'PDFs', icon: FileText, types: ['pdf'] },
+  { key: 'image', label: 'IMAGES', icon: Image, types: ['image'] },
+  { key: 'document', label: 'DOCS', icon: File, types: ['docx', 'txt'] },
 ];
+
+// Empty State ASCII Art Component
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-mono-dim">
+      <pre className="text-[10px] leading-tight opacity-30 mb-4">
+{`   ___________
+  |  _______  |
+  | |       | |
+  | |       | |
+  | |_______| |
+  |___________|
+   /         \\
+  /___________\\`}
+      </pre>
+      <p className="text-xs font-mono text-center">
+        [ NO FILES UPLOADED ]
+      </p>
+      <p className="text-[10px] font-mono text-center mt-2 opacity-50">
+        Upload a file to begin
+      </p>
+    </div>
+  );
+}
 
 function DrawerContent({ onClose }) {
   const { logout } = useAuth();
@@ -36,18 +54,17 @@ function DrawerContent({ onClose }) {
   const navigate = useNavigate();
   const [openSections, setOpenSections] = useState({ all: true });
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Filter files based on search and section type
   const getFilteredFiles = (types) => {
     return files.filter((f) => {
       const matchesSearch = (f.name || f.fileName || '').toLowerCase().includes(searchQuery.toLowerCase());
       if (!matchesSearch) return false;
-      if (types.length === 0) return true; // 'all'
-      // Simple type check mapping
+      if (types.length === 0) return true;
       const ext = (f.name || f.fileName || '').split('.').pop().toLowerCase();
       if (types.includes('image') && ['png', 'jpg', 'jpeg', 'gif'].includes(ext)) return true;
       if (types.includes('pdf') && ext === 'pdf') return true;
@@ -71,178 +88,197 @@ function DrawerContent({ onClose }) {
     if (onClose) onClose();
   };
 
-  const commonListItemSx = {
-    py: 0.5,
-    px: 2,
-    borderLeft: '2px solid transparent',
-    '&:hover': {
-      bgcolor: '#333333',
-      color: '#FFFFFF',
-      '& .MuiListItemIcon-root': { color: '#FFFFFF' },
-    },
-    '&.Mui-selected': {
-      bgcolor: '#333333',
-      borderLeft: '2px solid #00FF00',
-      color: '#00FF00',
-      '&:hover': { bgcolor: '#444444' },
-      '& .MuiListItemIcon-root': { color: '#00FF00' },
-    },
-    transition: 'none',
+  const handleCommandPalette = () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
   };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#000000', color: '#E5E5E5', fontFamily: 'monospace' }}>
-
-      {/* Header Area */}
-      <Box sx={{ p: 2, borderBottom: '1px solid #333333' }}>
-        <Typography variant="h6" sx={{ color: '#E5E5E5', fontWeight: 700, letterSpacing: '0.1em', fontFamily: 'monospace' }}>
+    <div className="h-full flex flex-col bg-mono-black text-mono-light font-mono">
+      {/* Header - Brand Only */}
+      <div className="px-4 py-4 border-b border-mono-gray">
+        <h1 className="text-lg font-bold tracking-wider text-mono-light">
           FileGeek
-        </Typography>
-        <Typography variant="caption" sx={{ color: '#888888', fontFamily: 'monospace' }}>
-          Your Study Sessions
-        </Typography>
-      </Box>
+        </h1>
+        <p className="text-[10px] text-mono-dim mt-1 uppercase tracking-wide">
+          Document Intelligence
+        </p>
+      </div>
 
-      {/* Search Bar */}
-      <Box sx={{ p: 2, borderBottom: '1px solid #333333' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #333333', px: 1 }}>
-          <SearchIcon sx={{ color: '#888', fontSize: 20, mr: 1 }} />
+      {/* Search Bar - Separated and Prominent */}
+      <div className="px-4 py-3 border-b border-mono-gray">
+        <button
+          onClick={handleCommandPalette}
+          className={`
+            w-full flex items-center gap-2 px-3 py-2
+            border border-mono-gray bg-mono-black
+            transition-all duration-200
+            ${searchFocused ? 'border-mono-accent shadow-[0_0_8px_rgba(0,255,0,0.2)]' : 'hover:border-mono-dim'}
+          `}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+        >
+          <Search className="w-4 h-4 text-mono-dim flex-shrink-0" />
           <input
             type="text"
-            placeholder="SEARCH_FILES..."
+            placeholder="SEARCH FILES..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#E5E5E5',
-              fontFamily: 'monospace',
-              fontSize: '0.875rem',
-              width: '100%',
-              padding: '8px 0',
-              outline: 'none',
-            }}
+            className="
+              flex-1 bg-transparent border-none outline-none
+              text-mono-light text-xs font-mono
+              placeholder:text-mono-dim
+            "
+            style={{ caretColor: '#00FF00' }}
           />
-        </Box>
-      </Box>
+          <span className="text-[10px] text-mono-dim">⌘K</span>
+        </button>
+      </div>
 
-      {/* File List */}
-      <Box sx={{ flex: 1, overflowY: 'auto' }}>
-        <List sx={{ pt: 0 }}>
-          {SECTIONS.map((section) => {
-            const sectionFiles = getFilteredFiles(section.types);
-            if (section.key !== 'all' && sectionFiles.length === 0) return null;
+      {/* Primary Action - Upload Button */}
+      <div className="px-4 py-3 border-b border-mono-gray">
+        <label htmlFor="sidebar-upload-input">
+          <input
+            id="sidebar-upload-input"
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFileSelect(e.target.files[0])}
+          />
+          <div
+            className="
+              w-full flex items-center justify-center gap-2
+              px-4 py-3 cursor-pointer
+              bg-mono-accent text-mono-black
+              border border-mono-accent
+              font-bold text-xs tracking-wide uppercase
+              transition-all duration-200
+              hover:bg-transparent hover:text-mono-accent
+              active:scale-[0.98]
+            "
+          >
+            <Upload className="w-4 h-4" />
+            <span>Upload New File</span>
+          </div>
+        </label>
+      </div>
 
-            return (
-              <React.Fragment key={section.key}>
-                <ListItemButton onClick={() => toggleSection(section.key)} sx={commonListItemSx}>
-                  <ListItemIcon sx={{ minWidth: 32, color: '#888' }}>
-                    {section.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={section.label}
-                    primaryTypographyProps={{
-                      fontFamily: 'monospace',
-                      fontWeight: 700,
-                      fontSize: '0.875rem'
-                    }}
-                  />
-                  {openSections[section.key] ? <ExpandLess sx={{ fontSize: 16, color: '#888' }} /> : <ExpandMore sx={{ fontSize: 16, color: '#888' }} />}
-                </ListItemButton>
+      {/* File List Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        {files.length === 0 && !searchQuery ? (
+          <EmptyState />
+        ) : (
+          <div className="py-2">
+            {SECTIONS.map((section) => {
+              const sectionFiles = getFilteredFiles(section.types);
+              if (section.key !== 'all' && sectionFiles.length === 0) return null;
 
-                <Collapse in={openSections[section.key]} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    {sectionFiles.map((f, idx) => {
-                      // Find the actual index in the global files array
-                      // This is a bit inefficient but safe for now
-                      const globalIndex = files.indexOf(f);
-                      const isSelected = globalIndex === activeFileIndex;
+              const isOpen = openSections[section.key];
+              const SectionIcon = section.icon;
 
-                      return (
-                        <ListItemButton
-                          key={idx}
-                          selected={isSelected}
-                          onClick={() => {
-                            setActiveFileIndex(globalIndex);
-                            if (onClose) onClose();
-                          }}
-                          sx={{
-                            ...commonListItemSx,
-                            pl: 6,
-                            py: 0.25,
-                          }}
-                        >
-                          <ListItemText
-                            primary={f.fileName || f.name}
-                            primaryTypographyProps={{
-                              fontSize: '0.75rem',
-                              fontFamily: 'monospace',
-                              noWrap: true,
-                            }}
-                          />
-                        </ListItemButton>
-                      );
-                    })}
-                    {sectionFiles.length === 0 && (
-                      <Typography sx={{ pl: 6, py: 1, color: '#555', fontSize: '0.75rem', fontStyle: 'italic', fontFamily: 'monospace' }}>
-                        [NO FILES]
-                      </Typography>
+              return (
+                <div key={section.key} className="mb-1">
+                  {/* Section Header */}
+                  <button
+                    onClick={() => toggleSection(section.key)}
+                    className="
+                      w-full flex items-center gap-2 px-4 py-2
+                      text-xs font-bold uppercase tracking-wide
+                      text-mono-dim hover:text-mono-light
+                      border-l-2 border-transparent
+                      hover:bg-mono-gray hover:border-l-2 hover:border-mono-dim
+                      transition-all duration-150
+                    "
+                  >
+                    <SectionIcon className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1 text-left">{section.label}</span>
+                    {isOpen ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
                     )}
-                  </List>
-                </Collapse>
-                <Divider sx={{ borderColor: '#222' }} />
-              </React.Fragment>
-            );
-          })}
-        </List>
-      </Box>
+                  </button>
 
-      {/* Footer Controls */}
-      <Box sx={{ p: 0, borderTop: '1px solid #333333' }}>
-        <ListItemButton onClick={handleHome} sx={commonListItemSx}>
-          <ListItemIcon sx={{ minWidth: 32, color: '#888' }}><HomeIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary="[DASHBOARD]" primaryTypographyProps={{ fontFamily: 'monospace', fontSize: '0.875rem' }} />
-        </ListItemButton>
-        <ListItemButton onClick={handleLogout} sx={commonListItemSx}>
-          <ListItemIcon sx={{ minWidth: 32, color: '#888' }}><LogoutIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary="[LOGOUT]" primaryTypographyProps={{ fontFamily: 'monospace', fontSize: '0.875rem' }} />
-        </ListItemButton>
-        <Box sx={{ p: 2 }}>
-          <label htmlFor="sidebar-upload-input">
-            <input
-              id="sidebar-upload-input"
-              type="file"
-              multiple
-              style={{ display: 'none' }}
-              onChange={(e) => handleFileSelect(e.target.files[0])}
-            />
-            <Box
-              sx={{
-                border: '1px solid #333333',
-                color: '#E5E5E5',
-                textAlign: 'center',
-                py: 1,
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                '&:hover': {
-                  bgcolor: '#333333',
-                  borderColor: '#E5E5E5'
-                },
-                fontFamily: 'monospace'
-              }}
-            >
-              [ UPLOAD NEW FILE ]
-            </Box>
-          </label>
-        </Box>
-      </Box>
-    </Box>
+                  {/* Section Files */}
+                  {isOpen && (
+                    <div className="py-1">
+                      {sectionFiles.length === 0 ? (
+                        <div className="px-4 py-2 pl-10 text-[10px] text-mono-dim italic">
+                          [NO FILES]
+                        </div>
+                      ) : (
+                        sectionFiles.map((f, idx) => {
+                          const globalIndex = files.indexOf(f);
+                          const isSelected = globalIndex === activeFileIndex;
+
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setActiveFileIndex(globalIndex);
+                                if (onClose) onClose();
+                              }}
+                              className={`
+                                w-full px-4 py-2 pl-10 text-left
+                                text-[11px] font-mono truncate
+                                border-l-2 transition-all duration-150
+                                ${
+                                  isSelected
+                                    ? 'bg-[rgba(0,255,0,0.05)] border-l-2 border-mono-accent text-mono-accent shadow-[inset_0_0_8px_rgba(0,255,0,0.1)] backdrop-blur-sm'
+                                    : 'border-transparent text-mono-light hover:bg-mono-gray hover:border-mono-dim hover:text-mono-light'
+                                }
+                              `}
+                            >
+                              {f.fileName || f.name}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Footer - Navigation & Logout */}
+      <div className="border-t border-[#1a1a1a] bg-mono-black">
+        <button
+          onClick={handleHome}
+          className="
+            w-full flex items-center gap-3 px-4 py-3
+            text-xs font-mono uppercase tracking-wide
+            text-mono-dim hover:text-mono-light
+            border-l-2 border-transparent
+            hover:bg-mono-gray hover:border-mono-dim
+            transition-all duration-150
+          "
+        >
+          <Home className="w-4 h-4" />
+          <span>Dashboard</span>
+        </button>
+
+        <button
+          onClick={handleLogout}
+          className="
+            w-full flex items-center gap-3 px-4 py-3
+            text-xs font-mono uppercase tracking-wide
+            text-mono-dim hover:text-red-500
+            border-l-2 border-transparent
+            hover:bg-mono-gray hover:border-red-500
+            transition-all duration-150
+          "
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
   );
 }
 
 export default function LeftDrawer({ open, onClose, embedded }) {
-  // If embedded (desktop), just render content without Drawer wrapper
   if (embedded) {
     return <DrawerContent onClose={onClose} />;
   }
@@ -253,7 +289,12 @@ export default function LeftDrawer({ open, onClose, embedded }) {
       open={open}
       onClose={onClose}
       PaperProps={{
-        sx: { width: 280, bgcolor: '#000000', color: '#E5E5E5' }
+        sx: {
+          width: 280,
+          bgcolor: '#000000',
+          color: '#E5E5E5',
+          borderRight: '1px solid #1a1a1a',
+        }
       }}
     >
       <DrawerContent onClose={onClose} />
