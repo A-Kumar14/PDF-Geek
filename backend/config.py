@@ -12,7 +12,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     HOST = os.getenv("FLASK_HOST", "0.0.0.0")
-    PORT = int(os.getenv("FLASK_PORT", "5000"))
+    PORT = int(os.getenv("FLASK_PORT", "5001"))  # Changed from 5000 to avoid macOS AirPlay conflict
 
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")

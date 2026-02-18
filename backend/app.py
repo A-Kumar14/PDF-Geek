@@ -1226,5 +1226,5 @@ if __name__ == "__main__":
         logger.error("Set GOOGLE_API_KEY (Gemini) or OPENAI_API_KEY to start the server")
         raise SystemExit(1)
 
-    logger.info("Starting FileGeek backend server...")
-    app.run(debug=False, host="0.0.0.0", port=5000)
+    logger.info(f"Starting FileGeek backend server on port {Config.PORT}...")
+    app.run(debug=False, host=Config.HOST, port=Config.PORT)
