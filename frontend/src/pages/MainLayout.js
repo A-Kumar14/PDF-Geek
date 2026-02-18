@@ -213,11 +213,11 @@ export default function MainLayout() {
           </>
         ) : (
           // Desktop: Use resizable panels
-          <Group direction="horizontal" style={{ width: '100%', height: '100%' }}>
+          <Group direction="horizontal" style={{ width: '100%', height: '100%', position: 'relative' }}>
             {/* Drawer Panel */}
             {effectiveDrawer && (
               <>
-                <Panel defaultSize={18} minSize={12} maxSize={25} order={1}>
+                <Panel defaultSize={18} minSize={12} maxSize={25} order={1} style={{ position: 'relative', zIndex: 10 }}>
                   <Box
                     role="complementary"
                     aria-label="Session history"
@@ -228,17 +228,19 @@ export default function MainLayout() {
                       width: '100%',
                       overflow: 'hidden',
                       bgcolor: '#000000',
+                      position: 'relative',
+                      zIndex: 10,
                     }}
                   >
                     <LeftDrawer open={true} onClose={() => setDrawerOpen(false)} embedded />
                   </Box>
                 </Panel>
-                <Separator style={{ width: '1px', background: BORDER_COLOR }} />
+                <Separator style={{ width: '1px', background: BORDER_COLOR, flexShrink: 0, zIndex: 10 }} />
               </>
             )}
 
             {/* Document Viewer Panel */}
-            <Panel defaultSize={effectiveDrawer ? 47 : 65} minSize={30} order={2}>
+            <Panel defaultSize={effectiveDrawer ? 47 : 65} minSize={30} order={2} style={{ position: 'relative', zIndex: 1 }}>
               <Box
                 role="region"
                 aria-label="Document viewer"
@@ -250,6 +252,7 @@ export default function MainLayout() {
                   width: '100%',
                   overflow: 'hidden',
                   bgcolor: '#0D0D0D',
+                  zIndex: 1,
                 }}
               >
                 {file ? (
@@ -363,7 +366,7 @@ export default function MainLayout() {
             </Separator>
 
             {/* Chat Panel */}
-            <Panel defaultSize={35} minSize={25} order={3}>
+            <Panel defaultSize={35} minSize={25} order={3} style={{ position: 'relative', zIndex: 1 }}>
               <Box
                 id="main-content"
                 role="main"
@@ -375,6 +378,7 @@ export default function MainLayout() {
                   width: '100%',
                   overflow: 'hidden',
                   bgcolor: '#000000',
+                  zIndex: 1,
                 }}
               >
                 <ChatPanel />

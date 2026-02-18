@@ -93,7 +93,7 @@ function DrawerContent({ onClose }) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-mono-black text-mono-light font-mono">
+    <div className="h-full flex flex-col bg-mono-black text-mono-light font-mono relative z-10">
       {/* Header - Brand Only */}
       <div className="px-4 py-4 border-b border-mono-gray">
         <h1 className="text-lg font-bold tracking-wider text-mono-light">
