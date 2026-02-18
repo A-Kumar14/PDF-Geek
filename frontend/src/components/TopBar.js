@@ -12,8 +12,6 @@ import {
   Badge,
   Tooltip,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SearchIcon from '@mui/icons-material/Search';
 import SchoolIcon from '@mui/icons-material/School';
@@ -42,7 +40,7 @@ const PERSONA_ICONS = {
   sherlock: <PolicyIcon fontSize="small" />,
 };
 
-export default function TopBar({ onToggleDrawer, drawerOpen, onOpenSettings }) {
+export default function TopBar({ onOpenSettings }) {
   const navigate = useNavigate();
   const { file, removeFile } = useFile();
   const { clearMessages } = useChatContext();
@@ -75,10 +73,6 @@ export default function TopBar({ onToggleDrawer, drawerOpen, onOpenSettings }) {
           bgcolor: '#000000',
         }}
       >
-        <IconButton edge="start" onClick={onToggleDrawer} size="small" aria-label="Toggle sidebar" sx={{ color: '#888' }}>
-          {drawerOpen ? <MenuOpenIcon /> : <MenuIcon />}
-        </IconButton>
-
         {/* Logo */}
         <Box
           onClick={handleNew}

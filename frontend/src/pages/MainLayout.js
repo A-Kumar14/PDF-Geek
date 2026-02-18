@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Box, Tab, Tabs, Dialog, DialogContent, useMediaQuery, useTheme } from '@mui/material';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import TopBar from '../components/TopBar';
-import LeftDrawer from '../components/LeftDrawer';
 import ChatPanel from '../components/ChatPanel';
 import FileViewer from '../components/FileViewer';
 import DropZone from '../components/DropZone';
@@ -18,7 +17,6 @@ const DRAWER_WIDTH = 260; // Slightly narrower for compactness
 const BORDER_COLOR = '#333333';
 
 export default function MainLayout() {
-  const [drawerOpen, setDrawerOpen] = useState(true);
   const { file, files, fileType, activeFileIndex, setActiveFileIndex, removeFile, targetPage, reportPageChange } = useFile();
   const { clearMessages, artifacts } = useChatContext();
   const { pinnedNotes, notesPanelOpen } = useHighlights();
@@ -36,7 +34,6 @@ export default function MainLayout() {
     clearMessages();
   };
 
-  const effectiveDrawer = isMobile ? false : drawerOpen;
   const hasArtifacts = artifacts && artifacts.length > 0;
   const showNotesPanel = notesPanelOpen;
   const showArtifacts = hasArtifacts && !showNotesPanel;
@@ -55,7 +52,7 @@ export default function MainLayout() {
       overflow: 'hidden',
     }}>
       <Box sx={{ borderBottom: borderStyle }}>
-        <TopBar onToggleDrawer={() => setDrawerOpen((d) => !d)} drawerOpen={effectiveDrawer} onOpenSettings={() => setSettingsOpen(true)} />
+        <TopBar onOpenSettings={() => setSettingsOpen(true)} />
       </Box>
 
       {/* Mobile tab switcher */}
@@ -94,24 +91,8 @@ export default function MainLayout() {
         }}
       >
         {isMobile ? (
-          // Mobile: Use simple layout without resizing
+          // Mobile: Use simple layout without sidebar
           <>
-            {effectiveDrawer && (
-              <Box
-                role="complementary"
-                aria-label="Session history"
-                sx={{
-                  display: { xs: 'none', md: 'flex' },
-                  flexDirection: 'column',
-                  minHeight: 0,
-                  width: DRAWER_WIDTH,
-                  bgcolor: '#000000',
-                }}
-              >
-                <LeftDrawer open={true} onClose={() => setDrawerOpen(false)} embedded />
-              </Box>
-            )}
-            {effectiveDrawer && <Box sx={{ width: '1px', bgcolor: BORDER_COLOR }} />}
 
             {/* Document Viewer */}
             <Box
@@ -212,35 +193,10 @@ export default function MainLayout() {
             </Box>
           </>
         ) : (
-          // Desktop: Use resizable panels
+          // Desktop: Use resizable panels without sidebar
           <Group direction="horizontal" style={{ width: '100%', height: '100%', position: 'relative' }}>
-            {/* Drawer Panel */}
-            {effectiveDrawer && (
-              <>
-                <Panel defaultSize={18} minSize={12} maxSize={25} order={1} style={{ position: 'relative', zIndex: 10 }}>
-                  <Box
-                    role="complementary"
-                    aria-label="Session history"
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      height: '100%',
-                      width: '100%',
-                      overflow: 'hidden',
-                      bgcolor: '#000000',
-                      position: 'relative',
-                      zIndex: 10,
-                    }}
-                  >
-                    <LeftDrawer open={true} onClose={() => setDrawerOpen(false)} embedded />
-                  </Box>
-                </Panel>
-                <Separator style={{ width: '1px', background: BORDER_COLOR, flexShrink: 0, zIndex: 10 }} />
-              </>
-            )}
-
             {/* Document Viewer Panel */}
-            <Panel defaultSize={effectiveDrawer ? 47 : 65} minSize={30} order={2} style={{ position: 'relative', zIndex: 1 }}>
+            <Panel defaultSize={65} minSize={40} order={1} style={{ position: 'relative', zIndex: 1 }}>
               <Box
                 role="region"
                 aria-label="Document viewer"
@@ -366,7 +322,7 @@ export default function MainLayout() {
             </Separator>
 
             {/* Chat Panel */}
-            <Panel defaultSize={35} minSize={25} order={3} style={{ position: 'relative', zIndex: 1 }}>
+            <Panel defaultSize={35} minSize={25} order={2} style={{ position: 'relative', zIndex: 1 }}>
               <Box
                 id="main-content"
                 role="main"
@@ -389,7 +345,7 @@ export default function MainLayout() {
             {(showNotesPanel || showArtifacts) && (
               <>
                 <Separator style={{ width: '1px', background: BORDER_COLOR, flexShrink: 0 }} />
-                <Panel defaultSize={20} minSize={15} maxSize={30} order={4}>
+                <Panel defaultSize={20} minSize={15} maxSize={30} order={3}>
                   <Box
                     role="complementary"
                     aria-label="Side panel"
