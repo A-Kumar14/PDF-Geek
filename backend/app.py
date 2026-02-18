@@ -423,6 +423,7 @@ def send_session_message(session_id):
 
     deep_think = bool(data.get("deepThink", False))
     use_async = bool(data.get("async", False))
+    custom_model = data.get("model")  # Optional model selection from frontend
 
     # Save user message
     user_msg = ChatMessage(session_id=session_id, role="user", content=question)
@@ -436,8 +437,8 @@ def send_session_message(session_id):
         logger.info("message.task.dispatched", task_id=task.id, session_id=session_id)
         return jsonify({"task_id": task.id, "status": "queued", "user_message_id": user_msg.id}), 202
 
-    # Synchronous path
-    model_override = AIService.RESPONSE_MODEL if deep_think else None
+    # Synchronous path - prioritize custom model, then deep think model, then default
+    model_override = custom_model or (AIService.RESPONSE_MODEL if deep_think else None)
 
     # Build chat history from DB
     recent_msgs = ChatMessage.query.filter_by(session_id=session_id).order_by(

@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FileProvider } from './contexts/FileContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { PersonaProvider } from './contexts/PersonaContext';
+import { ModelProvider } from './contexts/ModelContext';
 import { AnnotationProvider } from './contexts/AnnotationContext';
 import { HighlightsProvider } from './contexts/HighlightsContext';
 import LoginPage from './pages/LoginPage';
@@ -50,16 +51,18 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <PersonaProvider>
-          <FileProvider>
-            <ChatProvider>
-              <AnnotationProvider>
-                <HighlightsProvider>
-                  <a href="#main-content" className="skip-to-content">Skip to content</a>
-                  <AppRoutes />
-                </HighlightsProvider>
-              </AnnotationProvider>
-            </ChatProvider>
-          </FileProvider>
+          <ModelProvider>
+            <FileProvider>
+              <ChatProvider>
+                <AnnotationProvider>
+                  <HighlightsProvider>
+                    <a href="#main-content" className="skip-to-content">Skip to content</a>
+                    <AppRoutes />
+                  </HighlightsProvider>
+                </AnnotationProvider>
+              </ChatProvider>
+            </FileProvider>
+          </ModelProvider>
         </PersonaProvider>
       </AuthProvider>
     </QueryClientProvider>

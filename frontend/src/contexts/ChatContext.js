@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import useChat from '../hooks/useChat';
 import { useFile } from './FileContext';
 import { usePersona } from './PersonaContext';
+import { useModelContext } from './ModelContext';
 import { useSessionsList, useCreateSession, useDeleteSession } from '../hooks/useSessions';
 import useDocumentIndexing from '../hooks/useDocumentIndexing';
 import {
@@ -37,6 +38,7 @@ export function ChatProvider({ children }) {
   const { sendMessage: apiSendMessage } = useChat();
   const fileCtx = useFile();
   const { personaId } = usePersona();
+  const { selectedModel } = useModelContext();
   const queryClient = useQueryClient();
 
   // React Query hooks for server state
@@ -224,6 +226,7 @@ export function ChatProvider({ children }) {
           result = await sendSessionMessage(sessionId, {
             question: question.trim(),
             deepThink: deepThinkEnabled,
+            model: selectedModel,  // Pass selected model to backend
           });
         } catch {
           result = null;
@@ -267,8 +270,20 @@ export function ChatProvider({ children }) {
         setSuggestions(result.suggestions);
       }
     } catch (err) {
-      console.error(err);
-      const errorMsg = err.response?.data?.error || 'Something went wrong. Please try again.';
+      console.error('Chat error:', err);
+      let errorMsg = 'Something went wrong. Please try again.';
+
+      if (err.response) {
+        // Server responded with error status
+        errorMsg = err.response.data?.error || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        // Request made but no response (network/CORS issue)
+        errorMsg = 'Cannot reach server. Please check your connection and API URL configuration.';
+      } else {
+        // Something else went wrong
+        errorMsg = err.message || errorMsg;
+      }
+
       const finalMessages = [...newMessages, {
         role: 'assistant',
         content: `Error: ${errorMsg}`,

@@ -28,8 +28,10 @@ import { useNavigate } from 'react-router-dom';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
 import { usePersona } from '../contexts/PersonaContext';
+import { useModelContext } from '../contexts/ModelContext';
 import { useHighlights } from '../contexts/HighlightsContext';
 import DeepThinkToggle from './DeepThinkToggle';
+import ModelSelector from './ModelSelector';
 
 const PERSONA_ICONS = {
   academic: <SchoolIcon fontSize="small" />,
@@ -45,8 +47,17 @@ export default function TopBar({ onToggleDrawer, drawerOpen, onOpenSettings }) {
   const { file, removeFile } = useFile();
   const { clearMessages } = useChatContext();
   const { personaId, selectPersona, personas, persona } = usePersona();
+  const { selectedModel, setSelectedModel } = useModelContext();
   const { pinnedNotes, notesPanelOpen, toggleNotesPanel } = useHighlights();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [modelAnchorEl, setModelAnchorEl] = useState(null);
+
+  const MODELS = [
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', badge: 'FREE' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'FREE' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', badge: 'PRO' },
+    { id: 'gpt-4o', name: 'GPT-4o', badge: 'PRO' },
+  ];
 
   const handleNew = () => {
     removeFile();
@@ -177,6 +188,79 @@ export default function TopBar({ onToggleDrawer, drawerOpen, onOpenSettings }) {
               {p.id === personaId && (
                 <CheckIcon sx={{ fontSize: 14, color: '#00FF00', ml: 1 }} />
               )}
+            </MenuItem>
+          ))}
+        </Menu>
+
+        {/* Model Selector */}
+        <Box
+          onClick={(e) => setModelAnchorEl(e.currentTarget)}
+          sx={{
+            border: '1px solid #333333',
+            px: 1,
+            py: 0.25,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            minWidth: 140,
+            '&:hover': { borderColor: '#E5E5E5' },
+          }}
+        >
+          <Typography sx={{ fontSize: '0.7rem', fontFamily: 'monospace', color: '#888888' }}>
+            MODEL:
+          </Typography>
+          <Typography sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#00FF00', fontWeight: 700 }}>
+            {selectedModel.split('-')[0].toUpperCase()}
+          </Typography>
+        </Box>
+
+        {/* Model dropdown */}
+        <Menu
+          anchorEl={modelAnchorEl}
+          open={Boolean(modelAnchorEl)}
+          onClose={() => setModelAnchorEl(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Box sx={{ px: 2, py: 1 }}>
+            <Typography variant="caption" sx={{ color: '#888', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.65rem' }}>
+              SELECT_MODEL
+            </Typography>
+          </Box>
+          {MODELS.map((model) => (
+            <MenuItem
+              key={model.id}
+              onClick={() => { setSelectedModel(model.id); setModelAnchorEl(null); }}
+              selected={model.id === selectedModel}
+              sx={{
+                py: 0.75,
+                display: 'flex',
+                justifyContent: 'space-between',
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(0, 255, 0, 0.1)',
+                  borderLeft: '2px solid #00FF00',
+                },
+              }}
+            >
+              <ListItemText
+                primary={model.name}
+                primaryTypographyProps={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: model.id === selectedModel ? 700 : 400 }}
+              />
+              <Box
+                sx={{
+                  ml: 2,
+                  px: 0.75,
+                  py: 0.25,
+                  bgcolor: model.badge === 'FREE' ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 255, 0.1)',
+                  border: `1px solid ${model.badge === 'FREE' ? '#00FF00' : '#FF00FF'}`,
+                  fontFamily: 'monospace',
+                  fontSize: '0.6rem',
+                  color: model.badge === 'FREE' ? '#00FF00' : '#FF00FF',
+                }}
+              >
+                {model.badge}
+              </Box>
             </MenuItem>
           ))}
         </Menu>

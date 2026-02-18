@@ -42,13 +42,38 @@
 .pdf-thumbnails {
   flex-shrink: 0;
   width: 100px;
+  height: 100%; /* Ensure it takes full parent height */
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-right: 1px solid #333333;
   background: #000000;
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  /* Custom scrollbar for better aesthetics */
+  scrollbar-width: thin;
+  scrollbar-color: #333333 #000000;
+}
+
+/* Webkit scrollbar styling */
+.pdf-thumbnails::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pdf-thumbnails::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+.pdf-thumbnails::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 0;
+}
+
+.pdf-thumbnails::-webkit-scrollbar-thumb:hover {
+  background: #555555;
 }
 
 .pdf-thumb {
