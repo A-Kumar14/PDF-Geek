@@ -105,11 +105,36 @@ function PdfViewer({ file, targetPage, onPageChange }) {
   const [darkFilter, setDarkFilter] = useState(false);
   const [pageInput, setPageInput] = useState('');
   const containerRef = useRef(null);
-  const pageWrapperRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const pageRefs = useRef([]);
+  const isScrollingTo = useRef(false);
 
-  const { addHighlight, addComment, setNotePanelOpen, highlights, notes, comments } = useAnnotations();
+  // Backward-compat: single active page wrapper for selection/annotation tools
+  const pageWrapperRef = { current: pageRefs.current[pageNum - 1] || null };
+
+  const { addHighlight, addComment, setNotePanelOpen, highlights, notes, comments, undo, redo } = useAnnotations();
   const { activeSourceHighlight } = useFile();
   const [computedSourceRects, setComputedSourceRects] = useState([]);
+
+  // Cmd+Z / Cmd+Shift+Z — undo/redo annotations
+  useEffect(() => {
+    const handleKey = (e) => {
+      // Ignore when typing in an input or textarea
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const ctrl = isMac ? e.metaKey : e.ctrlKey;
+      if (!ctrl || e.key !== 'z') return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [undo, redo]);
 
   const handleExportAnnotations = useCallback(() => {
     const data = { highlights, notes, comments, exportedAt: new Date().toISOString() };
@@ -131,23 +156,72 @@ function PdfViewer({ file, targetPage, onPageChange }) {
     setNumPages(total);
     setPageNum(1);
     setRotation(0);
+    pageRefs.current = [];
   }, []);
+
+  // Scroll to a page programmatically (from toolbar or thumbnail)
+  const scrollToPage = useCallback((n) => {
+    const el = pageRefs.current[n - 1];
+    const container = scrollContainerRef.current;
+    if (!el || !container) return;
+    isScrollingTo.current = true;
+    // Use direct scrollTop assignment — reliable even when scrollIntoView
+    // would scroll the wrong ancestor (e.g. the browser viewport).
+    const containerTop = container.getBoundingClientRect().top;
+    const elTop = el.getBoundingClientRect().top;
+    container.scrollBy({ top: elTop - containerTop - 8, behavior: 'smooth' });
+    setTimeout(() => { isScrollingTo.current = false; }, 800);
+  }, []);
+
+  // Update pageNum from IntersectionObserver as user scrolls
+  useEffect(() => {
+    if (numPages === 0 || !scrollContainerRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isScrollingTo.current) return;
+        let best = null;
+        let bestRatio = 0;
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
+            bestRatio = entry.intersectionRatio;
+            best = entry.target;
+          }
+        }
+        if (best) {
+          const n = parseInt(best.dataset.page, 10);
+          if (!isNaN(n)) setPageNum(n);
+        }
+      },
+      { root: scrollContainerRef.current, threshold: [0.3, 0.5, 0.8] }
+    );
+    pageRefs.current.forEach((el) => { if (el) observer.observe(el); });
+    return () => observer.disconnect();
+  }, [numPages]);
 
   useEffect(() => {
     if (targetPage && targetPage >= 1 && targetPage <= numPages) {
       setPageNum(targetPage);
+      scrollToPage(targetPage);
     }
-  }, [targetPage, numPages]);
+  }, [targetPage, numPages, scrollToPage]);
 
   useEffect(() => {
     if (onPageChange) onPageChange(pageNum, numPages);
   }, [pageNum, numPages, onPageChange]);
 
-  const findTextRectsForExcerpt = useCallback((excerptText) => {
-    const textLayer = pageWrapperRef.current?.querySelector('.react-pdf__Page__textContent');
+  // Navigate via toolbar buttons: set pageNum and scroll to it
+  const goToPage = useCallback((n) => {
+    const clamped = Math.max(1, Math.min(n, numPages));
+    setPageNum(clamped);
+    scrollToPage(clamped);
+  }, [numPages, scrollToPage]);
+
+  const findTextRectsForExcerpt = useCallback((excerptText, targetPageNum) => {
+    const wrapper = pageRefs.current[(targetPageNum || pageNum) - 1];
+    const textLayer = wrapper?.querySelector('.react-pdf__Page__textContent');
     if (!textLayer || !excerptText) return [];
     const words = excerptText.trim().split(/\s+/).slice(0, 8);
-    const containerRect = pageWrapperRef.current.getBoundingClientRect();
+    const containerRect = wrapper.getBoundingClientRect();
     return Array.from(textLayer.querySelectorAll('span'))
       .filter((span) => words.some((w) => span.textContent?.includes(w)))
       .map((span) => {
@@ -159,30 +233,35 @@ function PdfViewer({ file, targetPage, onPageChange }) {
           height: r.height / scale,
         };
       });
-  }, [scale]);
+  }, [scale, pageNum]);
 
   // Compute source highlight rects when activeSourceHighlight changes
   useEffect(() => {
-    if (!activeSourceHighlight || activeSourceHighlight.page !== pageNum) {
+    if (!activeSourceHighlight) {
       setComputedSourceRects([]);
       return;
     }
+    const targetP = activeSourceHighlight.page || pageNum;
+    setPageNum(targetP);
+    scrollToPage(targetP);
     const timer = setTimeout(() => {
-      const rects = findTextRectsForExcerpt(activeSourceHighlight.excerpt);
-      setComputedSourceRects(rects.length > 0 ? [{ page: pageNum, rects }] : []);
-      if (rects[0] && pageWrapperRef.current?.parentElement) {
-        pageWrapperRef.current.parentElement.scrollTo({
-          top: rects[0].y * scale - 80,
+      const rects = findTextRectsForExcerpt(activeSourceHighlight.excerpt, targetP);
+      setComputedSourceRects(rects.length > 0 ? [{ page: targetP, rects }] : []);
+      if (rects[0]) {
+        const wrapper = pageRefs.current[targetP - 1];
+        wrapper?.parentElement?.scrollTo({
+          top: wrapper.offsetTop + rects[0].y * scale - 80,
           behavior: 'smooth',
         });
       }
-    }, 300);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [activeSourceHighlight, pageNum, scale, findTextRectsForExcerpt]);
+  }, [activeSourceHighlight, scrollToPage, findTextRectsForExcerpt, pageNum, scale]);
 
   const handleHighlight = useCallback(() => {
-    if (!pageWrapperRef.current) return;
-    const result = getSelectionRectsRelativeTo(pageWrapperRef.current, scale);
+    const wrapper = pageRefs.current[pageNum - 1];
+    if (!wrapper) return;
+    const result = getSelectionRectsRelativeTo(wrapper, scale);
     if (!result) return;
     addHighlight({
       text: result.text,
@@ -193,8 +272,9 @@ function PdfViewer({ file, targetPage, onPageChange }) {
   }, [scale, pageNum, addHighlight]);
 
   const handleComment = useCallback((commentText) => {
-    if (!pageWrapperRef.current) return;
-    const result = getSelectionRectsRelativeTo(pageWrapperRef.current, scale);
+    const wrapper = pageRefs.current[pageNum - 1];
+    if (!wrapper) return;
+    const result = getSelectionRectsRelativeTo(wrapper, scale);
     if (!result) return;
     addComment({
       text: result.text,
@@ -213,6 +293,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
   return (
     <div className="pdf-viewer-wrap" ref={containerRef}>
       <Document
+        className="pdf-document"
         file={fileData}
         onLoadSuccess={onDocumentLoadSuccess}
         loading={
@@ -235,7 +316,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <ToolBtn
                     label="[<]"
-                    onClick={() => setPageNum((p) => Math.max(p - 1, 1))}
+                    onClick={() => goToPage(pageNum - 1)}
                     disabled={pageNum <= 1}
                     tooltip="Previous page"
                   />
@@ -245,13 +326,13 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                     onChange={(e) => setPageInput(e.target.value)}
                     onBlur={() => {
                       const val = parseInt(pageInput, 10);
-                      if (val >= 1 && val <= numPages) setPageNum(val);
+                      if (val >= 1 && val <= numPages) goToPage(val);
                       setPageInput('');
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const val = parseInt(pageInput, 10);
-                        if (val >= 1 && val <= numPages) setPageNum(val);
+                        if (val >= 1 && val <= numPages) goToPage(val);
                         setPageInput('');
                         e.target.blur();
                       }
@@ -276,7 +357,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                   </Typography>
                   <ToolBtn
                     label="[>]"
-                    onClick={() => setPageNum((p) => Math.min(p + 1, numPages))}
+                    onClick={() => goToPage(pageNum + 1)}
                     disabled={pageNum >= numPages}
                     tooltip="Next page"
                   />
@@ -337,28 +418,36 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                     key={n}
                     pageNumber={n}
                     isActive={pageNum === n}
-                    onClick={() => setPageNum(n)}
+                    onClick={() => goToPage(n)}
                   />
                 ))}
               </aside>
 
-              {/* ── Main page view ── */}
-              <div className="pdf-container">
-                <div
-                  className="pdf-page-wrapper"
-                  ref={pageWrapperRef}
-                  style={darkFilter ? { filter: 'invert(0.88) hue-rotate(180deg)' } : undefined}
-                >
-                  <Page
-                    pageNumber={pageNum}
-                    scale={scale}
-                    rotate={rotation}
-                    renderTextLayer={true}
-                    renderAnnotationLayer={true}
-                    devicePixelRatio={window.devicePixelRatio || 1}
-                  />
-                  <HighlightLayer pageNum={pageNum} scale={scale} sourceHighlights={computedSourceRects} />
-                </div>
+              {/* ── Main page view (all pages scrollable) ── */}
+              <div className="pdf-container" ref={scrollContainerRef}>
+                {Array.from({ length: numPages }, (_, i) => i + 1).map((n) => (
+                  <div
+                    key={n}
+                    className="pdf-page-wrapper"
+                    data-page={n}
+                    ref={(el) => { pageRefs.current[n - 1] = el; }}
+                    style={darkFilter ? { filter: 'invert(0.88) hue-rotate(180deg)' } : undefined}
+                  >
+                    <Page
+                      pageNumber={n}
+                      scale={scale}
+                      rotate={rotation}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      devicePixelRatio={window.devicePixelRatio || 1}
+                    />
+                    <HighlightLayer
+                      pageNum={n}
+                      scale={scale}
+                      sourceHighlights={computedSourceRects}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 

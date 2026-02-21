@@ -29,7 +29,6 @@ import { usePersona } from '../contexts/PersonaContext';
 import { useModelContext } from '../contexts/ModelContext';
 import { useHighlights } from '../contexts/HighlightsContext';
 import DeepThinkToggle from './DeepThinkToggle';
-import ModelSelector from './ModelSelector';
 
 const PERSONA_ICONS = {
   academic: <SchoolIcon fontSize="small" />,
@@ -51,9 +50,9 @@ export default function TopBar({ onOpenSettings }) {
   const [modelAnchorEl, setModelAnchorEl] = useState(null);
 
   const MODELS = [
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', badge: 'FREE' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', badge: 'FREE' },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini', badge: 'FREE' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', badge: 'PRO' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', badge: 'PRO' },
     { id: 'gpt-4o', name: 'GPT-4o', badge: 'PRO' },
   ];
 

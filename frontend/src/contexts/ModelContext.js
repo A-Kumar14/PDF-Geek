@@ -8,8 +8,8 @@ export function useModelContext() {
 
 export function ModelProvider({ children }) {
   const [selectedModel, setSelectedModel] = useState(() => {
-    // Load from localStorage or default to gemini-1.5-flash
-    return localStorage.getItem('filegeek-selected-model') || 'gemini-1.5-flash';
+    // Load from localStorage or default to gemini-2.0-flash
+    return localStorage.getItem('filegeek-selected-model') || 'gemini-2.0-flash';
   });
 
   // Save to localStorage whenever it changes

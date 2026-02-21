@@ -1,14 +1,22 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Box, TextField, IconButton, Typography, LinearProgress } from '@mui/material';
+import React, { useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import { Box, TextField, IconButton, Typography, LinearProgress, Menu, MenuItem } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
-
 import { useChatContext } from '../contexts/ChatContext';
 import { useFile } from '../contexts/FileContext';
-
+import { useModelContext } from '../contexts/ModelContext';
 import VoiceInput from './VoiceInput';
 import SuggestionChips from './SuggestionChips';
 import SuggestedPrompts from './SuggestedPrompts';
+
+const CHAT_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'GEMINI 2.0', badge: 'FREE' },
+  { id: 'gpt-4o-mini',      label: 'GPT-4o MINI', badge: 'FREE' },
+  { id: 'gemini-2.5-pro',   label: 'GEMINI 2.5 PRO', badge: 'PRO' },
+  { id: 'gpt-4o',           label: 'GPT-4o', badge: 'PRO' },
+];
+
+const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'));
 
 export default function ChatPanel() {
   const scrollRef = useRef(null);
@@ -21,10 +29,14 @@ export default function ChatPanel() {
     stopGeneration,
   } = useChatContext();
   const { file, goToSourcePage } = useFile();
+  const { selectedModel, setSelectedModel } = useModelContext();
 
   const [input, setInput] = useState('');
   const [showPrompts, setShowPrompts] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
+  const [modelMenuAnchor, setModelMenuAnchor] = useState(null);
+
+  const activeModelLabel = CHAT_MODELS.find(m => m.id === selectedModel)?.label || selectedModel.toUpperCase();
 
   const handleCopy = (id, content) => {
     navigator.clipboard.writeText(content).then(() => {
@@ -172,10 +184,18 @@ export default function ChatPanel() {
                   </Box>
                 )}
 
-                {/* Simplified Message Content Rendering */}
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                  {msg.content}
-                </Typography>
+                {/* Message Content */}
+                {msg.role === 'assistant' ? (
+                  <Box sx={{ fontFamily: 'monospace', fontSize: '0.875rem', lineHeight: 1.6, '& p': { m: 0, mb: 0.5 }, '& pre': { background: '#111', p: 1, borderRadius: 0, overflow: 'auto', border: '1px solid #333' }, '& code': { fontFamily: 'monospace', fontSize: '0.8rem', background: '#111', px: 0.5 }, '& h1,& h2,& h3': { mt: 1, mb: 0.5 }, '& ul,& ol': { pl: 2, mt: 0.5, mb: 0.5 }, '& table': { borderCollapse: 'collapse', width: '100%' }, '& th,& td': { border: '1px solid #333', p: 0.5 } }}>
+                    <Suspense fallback={<Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{msg.content}</Typography>}>
+                      <MarkdownRenderer content={msg.content} />
+                    </Suspense>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {msg.content}
+                  </Typography>
+                )}
 
                 {msg.isStreaming && (
                   <Box sx={{ display: 'inline-block', ml: 1, width: 8, height: 16, bgcolor: '#00FF00', animation: 'blink 1s step-end infinite' }} />
@@ -259,6 +279,78 @@ export default function ChatPanel() {
               }
             }}
           />
+
+          {/* Inline Model Selector pill */}
+          <Box
+            onClick={(e) => setModelMenuAnchor(e.currentTarget)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              border: '1px solid #333',
+              px: 1,
+              py: 0.25,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              '&:hover': { borderColor: '#E5E5E5' },
+            }}
+          >
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#00FF00', fontWeight: 700 }}>
+              {activeModelLabel}
+            </Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#555' }}>▾</Typography>
+          </Box>
+
+          <Menu
+            anchorEl={modelMenuAnchor}
+            open={Boolean(modelMenuAnchor)}
+            onClose={() => setModelMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            PaperProps={{
+              sx: {
+                bgcolor: '#0D0D0D',
+                border: '1px solid #333',
+                borderRadius: 0,
+                mt: -0.5,
+              },
+            }}
+          >
+            <Box sx={{ px: 1.5, pt: 1, pb: 0.5 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                SELECT MODEL
+              </Typography>
+            </Box>
+            {CHAT_MODELS.map((m) => (
+              <MenuItem
+                key={m.id}
+                selected={m.id === selectedModel}
+                onClick={() => { setSelectedModel(m.id); setModelMenuAnchor(null); }}
+                sx={{
+                  py: 0.5,
+                  px: 1.5,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  '&.Mui-selected': { bgcolor: 'rgba(0,255,0,0.08)', borderLeft: '2px solid #00FF00' },
+                  '&:hover': { bgcolor: '#1A1A1A' },
+                }}
+              >
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#E5E5E5', fontWeight: m.id === selectedModel ? 700 : 400 }}>
+                  {m.label}
+                </Typography>
+                <Typography sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.6rem',
+                  color: m.badge === 'FREE' ? '#00FF00' : '#FF00FF',
+                  border: `1px solid ${m.badge === 'FREE' ? '#00FF00' : '#FF00FF'}`,
+                  px: 0.5,
+                }}>
+                  {m.badge}
+                </Typography>
+              </MenuItem>
+            ))}
+          </Menu>
 
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {!isLoading ? (

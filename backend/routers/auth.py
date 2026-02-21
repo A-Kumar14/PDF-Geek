@@ -1,7 +1,9 @@
 """FastAPI auth routes: signup and login."""
 
+import asyncio
 import os
 from datetime import datetime, timedelta
+from functools import partial
 
 import bcrypt
 import jwt
@@ -39,10 +41,12 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    password_hash = bcrypt.hashpw(
-        password.encode("utf-8"), bcrypt.gensalt()
-    ).decode("utf-8")
-    user = User(name=name, email=email, password_hash=password_hash)
+    loop = asyncio.get_event_loop()
+    salt = await loop.run_in_executor(None, bcrypt.gensalt)
+    password_hash = await loop.run_in_executor(
+        None, partial(bcrypt.hashpw, password.encode("utf-8"), salt)
+    )
+    user = User(name=name, email=email, password_hash=password_hash.decode("utf-8"))
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -58,9 +62,13 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
-    if not user or not bcrypt.checkpw(
-        password.encode("utf-8"), user.password_hash.encode("utf-8")
-    ):
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    loop = asyncio.get_event_loop()
+    pw_matches = await loop.run_in_executor(
+        None, partial(bcrypt.checkpw, password.encode("utf-8"), user.password_hash.encode("utf-8"))
+    )
+    if not pw_matches:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = _create_token(user)

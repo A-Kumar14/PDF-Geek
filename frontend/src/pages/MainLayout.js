@@ -13,7 +13,6 @@ import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
 import { useHighlights } from '../contexts/HighlightsContext';
 
-const DRAWER_WIDTH = 260; // Slightly narrower for compactness
 const BORDER_COLOR = '#333333';
 
 export default function MainLayout() {

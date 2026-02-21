@@ -313,7 +313,7 @@ export function ChatProvider({ children }) {
       setLoading(false);
       stopLoadingPhases();
     }
-  }, [fileCtx, messages, activeSessionId, deepThinkEnabled, personaId, apiSendMessage, startNewSession, saveCurrentSession, startLoadingPhases, stopLoadingPhases, indexDocumentToSession, queryClient]);
+  }, [fileCtx, messages, activeSessionId, deepThinkEnabled, personaId, selectedModel, apiSendMessage, startNewSession, saveCurrentSession, startLoadingPhases, stopLoadingPhases, indexDocumentToSession, queryClient]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

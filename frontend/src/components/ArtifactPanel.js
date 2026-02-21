@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Tooltip, Button } from '@mui/material';
 import { useChatContext } from '../contexts/ChatContext';
+import QuizFlashcardDialog from './QuizFlashcardDialog';
 import axios from 'axios';
 
 function MermaidDiagram({ code }) {
@@ -30,7 +31,7 @@ function MermaidDiagram({ code }) {
   return <Box ref={containerRef} sx={{ overflow: 'auto', maxHeight: 400, p: 1 }} />;
 }
 
-function QuizCard({ data }) {
+function QuizCard({ data, onOpenDialog }) {
   const questions = Array.isArray(data) ? data : [];
 
   // Track user answers: array of selected option indices (null = unanswered)
@@ -69,6 +70,27 @@ function QuizCard({ data }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      {/* Open as interactive flashcard dialog */}
+      {onOpenDialog && (
+        <Button
+          onClick={onOpenDialog}
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: '#00FF00',
+            border: '1px solid #00FF00',
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 0,
+            alignSelf: 'flex-start',
+            '&:hover': { bgcolor: '#001A00' },
+          }}
+        >
+          [OPEN AS FLASHCARDS ▶]
+        </Button>
+      )}
+
       {/* Results banner */}
       {submitted && (
         <Box
@@ -624,7 +646,7 @@ function FlashcardComponent({ data, messageId, sessionId }) {
   );
 }
 
-function ArtifactRenderer({ artifact, sessionId }) {
+function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog }) {
   const type = artifact.artifact_type || artifact.viz_type || 'unknown';
 
   if (type === 'visualization' && artifact.viz_type === 'mermaid' && artifact.content) {
@@ -634,7 +656,7 @@ function ArtifactRenderer({ artifact, sessionId }) {
   if (type === 'quiz' && artifact.content) {
     try {
       const data = typeof artifact.content === 'string' ? JSON.parse(artifact.content) : artifact.content;
-      return <QuizCard data={data} />;
+      return <QuizCard data={data} onOpenDialog={onOpenQuizDialog ? () => onOpenQuizDialog(data) : undefined} />;
     } catch {
       return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>{artifact.content}</pre>;
     }
@@ -659,6 +681,7 @@ function ArtifactRenderer({ artifact, sessionId }) {
 
 export default function ArtifactPanel() {
   const { artifacts, clearArtifacts, activeSessionId } = useChatContext();
+  const [quizDialogData, setQuizDialogData] = useState(null);
 
   if (!artifacts || artifacts.length === 0) return null;
 
@@ -690,10 +713,20 @@ export default function ArtifactPanel() {
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#888', mb: 1, textTransform: 'uppercase' }}>
               {`// ${artifact.artifact_type || 'artifact'}${artifact.topic ? ` - ${artifact.topic}` : ''}`}
             </Typography>
-            <ArtifactRenderer artifact={artifact} sessionId={activeSessionId} />
+            <ArtifactRenderer
+              artifact={artifact}
+              sessionId={activeSessionId}
+              onOpenQuizDialog={setQuizDialogData}
+            />
           </Box>
         ))}
       </Box>
+
+      <QuizFlashcardDialog
+        open={Boolean(quizDialogData)}
+        onClose={() => setQuizDialogData(null)}
+        questions={quizDialogData || []}
+      />
     </Box>
   );
 }

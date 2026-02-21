@@ -21,7 +21,6 @@ import {
   Keyboard,
   Pin,
   LogOut,
-  Folder,
   Image,
   File,
 } from 'lucide-react';
@@ -62,14 +61,14 @@ export default function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await logout();
       navigate('/login');
     } catch (error) {
       console.error('Failed to log out', error);
     }
-  };
+  }, [logout, navigate]);
 
   const handleUploadTrigger = () => {
     setOpen(false);
@@ -214,7 +213,7 @@ export default function CommandPalette() {
     });
 
     return cmds;
-  }, [file, files, activeFileIndex, personas, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, toggleNotesPanel, setActiveFileIndex]);
+  }, [file, files, activeFileIndex, personas, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, toggleNotesPanel, setActiveFileIndex, handleLogout]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) {

@@ -180,13 +180,13 @@ def get_persona_prompt(persona: str = "academic", file_type: str = "pdf") -> str
 
 class AIService:
     # Gemini models
-    GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-1.5-flash")
-    GEMINI_RESPONSE_MODEL = os.getenv("GEMINI_RESPONSE_MODEL", "gemini-1.5-pro")
+    GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.0-flash")
+    GEMINI_RESPONSE_MODEL = os.getenv("GEMINI_RESPONSE_MODEL", "gemini-2.0-flash")
     GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
 
     # OpenAI models
-    OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
-    OPENAI_RESPONSE_MODEL = os.getenv("OPENAI_RESPONSE_MODEL", "gpt-4o-mini")
+    OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o")
+    OPENAI_RESPONSE_MODEL = os.getenv("OPENAI_RESPONSE_MODEL", "gpt-4o")
     OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
     # Backward-compatible aliases
@@ -425,7 +425,10 @@ class AIService:
             system_content += f"\n\nUser preferences: {preference_context}"
         system_content += (
             "\n\nYou have tools available. Use search_documents to find information from uploaded documents. "
-            "Use other tools when the user asks for quizzes, study guides, or visualizations. "
+            "Use generate_quiz when the user asks for a quiz or multiple-choice questions. "
+            "Use generate_flashcards when the user asks for flashcards, flash cards, or spaced repetition study cards. "
+            "Use create_study_guide when the user asks for a study guide or outline. "
+            "Use generate_visualization when the user asks for a diagram or visualization. "
             "If you cannot find information, state what's missing and suggest 2-3 alternative questions "
             "in this format: ```suggestions\n[{\"text\": \"...\", \"reason\": \"...\"}]\n```"
         )
@@ -522,7 +525,10 @@ class AIService:
             system_instruction += f"\n\nUser preferences: {preference_context}"
         system_instruction += (
             "\n\nYou have tools available. Use search_documents to find information from uploaded documents. "
-            "Use other tools when the user asks for quizzes, study guides, or visualizations. "
+            "Use generate_quiz when the user asks for a quiz or multiple-choice questions. "
+            "Use generate_flashcards when the user asks for flashcards, flash cards, or spaced repetition study cards. "
+            "Use create_study_guide when the user asks for a study guide or outline. "
+            "Use generate_visualization when the user asks for a diagram or visualization. "
             "If you cannot find information, state what's missing and suggest 2-3 alternative questions "
             "in this format: ```suggestions\n[{\"text\": \"...\", \"reason\": \"...\"}]\n```"
         )
