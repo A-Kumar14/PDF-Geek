@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 
 # Create required directories
-RUN mkdir -p backend/uploads backend/instance
+RUN mkdir -p backend/uploads backend/instance backend/chroma_data
 
 # Set working directory to backend so relative imports work
 WORKDIR /app/backend
@@ -38,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Run with gunicorn + uvicorn worker (FastAPI production server)
-CMD gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT} --timeout 120
+CMD gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT} --timeout 120

@@ -195,6 +195,10 @@ class FlashcardProgress(Base):
     )
 
     def to_dict(self):
+        # Confidence 0-100: ease_factor ranges from 1.3 (min) to 2.5 (max)
+        confidence_score = round(
+            max(0.0, min(100.0, (self.ease_factor - 1.3) / (2.5 - 1.3) * 100))
+        )
         return {
             "id": self.id,
             "session_id": self.session_id,
@@ -208,6 +212,7 @@ class FlashcardProgress(Base):
                 self.next_review_date.isoformat() if self.next_review_date else None
             ),
             "review_count": self.review_count,
+            "confidence_score": confidence_score,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

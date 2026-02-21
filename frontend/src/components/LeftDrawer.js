@@ -11,6 +11,7 @@ import {
   Folder,
   Image,
   File,
+  BarChart2,
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -257,6 +258,21 @@ function DrawerContent({ onClose }) {
         >
           <Home className="w-4 h-4" />
           <span>Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => { navigate('/analytics'); if (onClose) onClose(); }}
+          className="
+            w-full flex items-center gap-3 px-4 py-3
+            text-xs font-mono uppercase tracking-wide
+            text-mono-dim hover:text-mono-light
+            border-l-2 border-transparent
+            hover:bg-mono-gray hover:border-mono-dim
+            transition-all duration-150
+          "
+        >
+          <BarChart2 className="w-4 h-4" />
+          <span>Analytics</span>
         </button>
 
         <button

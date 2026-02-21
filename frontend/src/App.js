@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import SettingsPage from './pages/SettingsPage';
 import MainLayout from './pages/MainLayout';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -39,6 +40,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MainLayout />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <AnalyticsPage />
           </ProtectedRoute>
         }
       />

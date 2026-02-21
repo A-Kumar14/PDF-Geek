@@ -46,6 +46,16 @@ class FlashcardProgressCreate(BaseModel):
     status: str = "remaining"  # remaining | reviewing | known
 
 
+class QuizResultCreate(BaseModel):
+    session_id: str
+    message_id: int
+    topic: str = "General"
+    score: int
+    total_questions: int
+    answers: list = []
+    time_taken: Optional[int] = None
+
+
 class S3PresignRequest(BaseModel):
     fileName: str = "file"
     contentType: str = "application/octet-stream"

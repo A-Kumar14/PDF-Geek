@@ -31,29 +31,58 @@ function MermaidDiagram({ code }) {
   return <Box ref={containerRef} sx={{ overflow: 'auto', maxHeight: 400, p: 1 }} />;
 }
 
-function QuizCard({ data, onOpenDialog }) {
+function QuizCard({ data, onOpenDialog, messageId, sessionId, topic }) {
   const questions = Array.isArray(data) ? data : [];
 
-  // Track user answers: array of selected option indices (null = unanswered)
   const [userAnswers, setUserAnswers] = useState(Array(questions.length).fill(null));
   const [submitted, setSubmitted] = useState(false);
+  const startTimeRef = React.useRef(Date.now());
 
   if (!data || questions.length === 0) return null;
 
   const handleSelectOption = (questionIndex, optionIndex) => {
-    if (submitted) return; // Disable after submission
+    if (submitted) return;
     const newAnswers = [...userAnswers];
     newAnswers[questionIndex] = optionIndex;
     setUserAnswers(newAnswers);
   };
 
+  const saveQuizResult = async (score) => {
+    const token = localStorage.getItem('filegeek-token');
+    if (!token || !messageId || !sessionId) return;
+    const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000);
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5001'}/quiz/results`,
+        {
+          session_id: sessionId,
+          message_id: messageId,
+          topic: topic || 'Quiz',
+          score,
+          total_questions: questions.length,
+          answers: userAnswers,
+          time_taken: timeTaken,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      console.warn('Failed to save quiz result:', err);
+    }
+  };
+
   const handleSubmit = () => {
+    const correct = questions.reduce(
+      (acc, q, i) => acc + (userAnswers[i] === q.correct_index ? 1 : 0),
+      0
+    );
     setSubmitted(true);
+    saveQuizResult(correct);
   };
 
   const handleRetry = () => {
     setUserAnswers(Array(questions.length).fill(null));
     setSubmitted(false);
+    startTimeRef.current = Date.now();
   };
 
   const calculateScore = () => {
@@ -252,31 +281,36 @@ function FlashcardComponent({ data, messageId, sessionId }) {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [cardStatus, setCardStatus] = useState(Array(cards.length).fill('remaining')); // 'remaining', 'reviewing', 'known'
+  const [cardStatus, setCardStatus] = useState(Array(cards.length).fill('remaining'));
+  const [progressMap, setProgressMap] = useState({}); // card_index → {next_review_date, confidence_score}
 
   // Load progress from API on mount
   useEffect(() => {
     const loadProgress = async () => {
       const token = localStorage.getItem('filegeek-token');
-      if (!token || !messageId || !sessionId) return; // No auth or no IDs = skip persistence
+      if (!token || !messageId || !sessionId) return;
 
       try {
         const response = await axios.get(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/flashcards/progress/${sessionId}/${messageId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          `${process.env.REACT_APP_API_URL || 'http://localhost:5001'}/flashcards/progress/${sessionId}/${messageId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         const progress = response.data.progress || [];
         if (progress.length > 0) {
           const statusArray = Array(cards.length).fill('remaining');
+          const pMap = {};
           progress.forEach(p => {
             if (p.card_index >= 0 && p.card_index < cards.length) {
               statusArray[p.card_index] = p.status;
+              pMap[p.card_index] = {
+                next_review_date: p.next_review_date,
+                confidence_score: p.confidence_score ?? null,
+              };
             }
           });
           setCardStatus(statusArray);
+          setProgressMap(pMap);
         }
       } catch (err) {
         console.warn('Failed to load flashcard progress:', err);
@@ -288,11 +322,11 @@ function FlashcardComponent({ data, messageId, sessionId }) {
 
   const saveProgress = async (cardIndex, status) => {
     const token = localStorage.getItem('filegeek-token');
-    if (!token || !messageId || !sessionId) return; // No auth = skip persistence
+    if (!token || !messageId || !sessionId) return;
 
     try {
-      await axios.post(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/flashcards/progress`,
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5001'}/flashcards/progress`,
         {
           session_id: sessionId,
           message_id: messageId,
@@ -300,10 +334,18 @@ function FlashcardComponent({ data, messageId, sessionId }) {
           card_front: cards[cardIndex]?.front || '',
           status,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+      const updated = res.data.progress;
+      if (updated) {
+        setProgressMap(prev => ({
+          ...prev,
+          [cardIndex]: {
+            next_review_date: updated.next_review_date,
+            confidence_score: updated.confidence_score ?? null,
+          },
+        }));
+      }
     } catch (err) {
       console.warn('Failed to save flashcard progress:', err);
     }
@@ -440,6 +482,33 @@ function FlashcardComponent({ data, messageId, sessionId }) {
             >
               {currentCard.front}
             </Typography>
+            {/* Confidence + Next Review */}
+            {progressMap[currentIndex] != null && (
+              <Box sx={{ mt: 2, width: '100%', maxWidth: 200 }}>
+                {progressMap[currentIndex].confidence_score != null && (
+                  <Box sx={{ mb: 0.75 }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#666', mb: 0.25 }}>
+                      CONFIDENCE: {progressMap[currentIndex].confidence_score}%
+                    </Typography>
+                    <Box sx={{ height: 3, bgcolor: '#1A1A1A', width: '100%' }}>
+                      <Box
+                        sx={{
+                          height: '100%',
+                          width: `${progressMap[currentIndex].confidence_score}%`,
+                          bgcolor: progressMap[currentIndex].confidence_score >= 70 ? '#00FF00' : progressMap[currentIndex].confidence_score >= 40 ? '#FFAA00' : '#FF4444',
+                          transition: 'width 0.4s',
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                )}
+                {progressMap[currentIndex].next_review_date && (
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#555' }}>
+                    NEXT REVIEW: {new Date(progressMap[currentIndex].next_review_date).toLocaleDateString()}
+                  </Typography>
+                )}
+              </Box>
+            )}
             <Typography
               className="flip-hint"
               sx={{
@@ -656,7 +725,15 @@ function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog }) {
   if (type === 'quiz' && artifact.content) {
     try {
       const data = typeof artifact.content === 'string' ? JSON.parse(artifact.content) : artifact.content;
-      return <QuizCard data={data} onOpenDialog={onOpenQuizDialog ? () => onOpenQuizDialog(data) : undefined} />;
+      return (
+        <QuizCard
+          data={data}
+          messageId={artifact.message_id}
+          sessionId={artifact.session_id || sessionId}
+          topic={artifact.topic}
+          onOpenDialog={onOpenQuizDialog ? () => onOpenQuizDialog(data) : undefined}
+        />
+      );
     } catch {
       return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>{artifact.content}</pre>;
     }

@@ -29,13 +29,13 @@ from database import get_db, init_db
 from socket_manager import socket_app
 from dependencies import CurrentUser, DB, get_current_user
 from models_async import (
-    ChatMessage, FlashcardProgress, SessionDocument, StudySession, User,
+    ChatMessage, FlashcardProgress, QuizResult, SessionDocument, StudySession, User,
 )
 from routers.auth import router as auth_router
 from schemas import (
     ChatMessageCreate, DocumentCreate, ExportRequest, FeedbackCreate,
-    FlashcardProgressCreate, NotionExportRequest, S3PresignRequest,
-    SessionCreate, TTSRequest,
+    FlashcardProgressCreate, NotionExportRequest, QuizResultCreate,
+    S3PresignRequest, SessionCreate, TTSRequest,
 )
 from services.ai_service import AIService, PersonaManager
 from services.file_service import FileService
@@ -551,14 +551,15 @@ async def save_flashcard_progress(
     progress.updated_at = datetime.utcnow()
 
     if data.status == "known":
-        progress.ease_factor = min(progress.ease_factor + 0.1, 2.5)
+        progress.ease_factor = min(2.5, progress.ease_factor + 0.1)
         progress.interval_days = max(1, int(progress.interval_days * progress.ease_factor))
         progress.next_review_date = datetime.utcnow() + timedelta(days=progress.interval_days)
     elif data.status == "reviewing":
+        progress.ease_factor = max(1.3, progress.ease_factor - 0.15)
         progress.interval_days = 1
         progress.next_review_date = datetime.utcnow() + timedelta(days=1)
-    else:
-        progress.ease_factor = 2.5
+    else:  # remaining
+        progress.ease_factor = max(1.3, progress.ease_factor - 0.3)
         progress.interval_days = 1
         progress.next_review_date = None
 
@@ -589,6 +590,93 @@ async def load_flashcard_progress(
     )
     records = prog_result.scalars().all()
     return {"progress": [p.to_dict() for p in records]}
+
+
+# ── Quiz results ───────────────────────────────────────────────────────────────
+@app.post("/quiz/results")
+async def save_quiz_result(data: QuizResultCreate, current_user: CurrentUser, db: DB):
+    sess_result = await db.execute(
+        select(StudySession).where(
+            StudySession.id == data.session_id,
+            StudySession.user_id == current_user.id,
+        )
+    )
+    if not sess_result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    result = QuizResult(
+        session_id=data.session_id,
+        message_id=data.message_id,
+        topic=data.topic,
+        score=data.score,
+        total_questions=data.total_questions,
+        answers_json=json.dumps(data.answers),
+        time_taken=data.time_taken,
+    )
+    db.add(result)
+    await db.commit()
+    await db.refresh(result)
+    return {"message": "Quiz result saved", "result": result.to_dict()}
+
+
+# ── Analytics ──────────────────────────────────────────────────────────────────
+@app.get("/analytics/summary")
+async def get_analytics_summary(current_user: CurrentUser, db: DB):
+    sessions_result = await db.execute(
+        select(StudySession).where(StudySession.user_id == current_user.id)
+    )
+    sessions = sessions_result.scalars().all()
+    session_ids = [s.id for s in sessions]
+
+    if session_ids:
+        quiz_result = await db.execute(
+            select(QuizResult)
+            .where(QuizResult.session_id.in_(session_ids))
+            .order_by(QuizResult.created_at.desc())
+        )
+        quiz_results = quiz_result.scalars().all()
+
+        fc_result = await db.execute(
+            select(FlashcardProgress).where(
+                FlashcardProgress.session_id.in_(session_ids)
+            )
+        )
+        fc_records = fc_result.scalars().all()
+    else:
+        quiz_results = []
+        fc_records = []
+
+    total_quizzes = len(quiz_results)
+    avg_score = (
+        round(
+            sum(
+                q.score / q.total_questions * 100
+                for q in quiz_results
+                if q.total_questions > 0
+            )
+            / total_quizzes,
+            1,
+        )
+        if total_quizzes > 0
+        else 0
+    )
+    today = datetime.utcnow().date()
+    cards_due = sum(
+        1
+        for r in fc_records
+        if r.next_review_date and r.next_review_date.date() <= today
+    )
+
+    return {
+        "total_sessions": len(sessions),
+        "total_quizzes": total_quizzes,
+        "avg_quiz_score": avg_score,
+        "recent_quizzes": [q.to_dict() for q in quiz_results[:10]],
+        "total_flashcards": len(fc_records),
+        "known_flashcards": sum(1 for r in fc_records if r.status == "known"),
+        "reviewing_flashcards": sum(1 for r in fc_records if r.status == "reviewing"),
+        "cards_due_today": cards_due,
+    }
 
 
 # ── Transcription ──────────────────────────────────────────────────────────────
