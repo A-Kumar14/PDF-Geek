@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Tab, Tabs, Dialog, DialogContent, useMediaQuery, useTheme } from '@mui/material';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import TopBar from '../components/TopBar';
@@ -25,6 +25,18 @@ export default function MainLayout() {
   // Mobile tab state: 0 = document, 1 = chat
   const [mobileTab, setMobileTab] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  // '?' key opens shortcuts cheat-sheet
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+        setShortcutsOpen(open => !open);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const personaBg = '#000000'; // Enforce black
 
@@ -407,6 +419,29 @@ export default function MainLayout() {
       >
         <DialogContent>
           <SettingsContent />
+        </DialogContent>
+      </Dialog>
+      {/* Shortcuts cheat-sheet dialog */}
+      <Dialog
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: '#0D0D0D', color: '#E5E5E5', border: '1px solid #333', borderRadius: 0 } }}
+      >
+        <DialogContent sx={{ p: 2.5 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 2, textTransform: 'uppercase' }}>// Keyboard Shortcuts</Typography>
+          {[
+            ['cmd+K', 'Open Command Palette'],
+            ['?', 'Toggle this cheat-sheet'],
+            ['Esc', 'Close dialogs / palette'],
+            ['Enter', 'Send message'],
+          ].map(([key, desc]) => (
+            <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.75, borderBottom: '1px solid #1A1A1A' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#E5E5E5' }}>{desc}</Typography>
+              <Box sx={{ border: '1px solid #333', px: 1, py: 0.25, fontFamily: 'monospace', fontSize: '0.65rem', color: '#FFAA00', borderRadius: 0 }}>{key}</Box>
+            </Box>
+          ))}
         </DialogContent>
       </Dialog>
     </Box>

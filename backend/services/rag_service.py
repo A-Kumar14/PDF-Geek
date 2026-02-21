@@ -137,6 +137,25 @@ class RAGService:
             logger.warning(f"RAG query failed: {e}")
             return {"chunks": [], "metas": []}
 
+    def query_all_sessions(self, question: str, user_id: int, n_results: int = 5) -> Dict:
+        """Cross-session retrieval: search ALL documents belonging to a user."""
+        try:
+            results = self.vectorstore.similarity_search(
+                query=question,
+                k=n_results,
+                filter={"user_id": str(user_id)},
+            )
+            chunks = [doc.page_content for doc in results]
+            metas = [doc.metadata for doc in results]
+            logger.info(
+                f"RAG cross-session query: user={user_id} chunks_returned={len(chunks)} "
+                f"question_prefix={question[:60]!r}"
+            )
+            return {"chunks": chunks, "metas": metas}
+        except Exception as e:
+            logger.warning(f"RAG cross-session query failed: {e}")
+            return {"chunks": [], "metas": []}
+
     def delete_session_documents(self, session_id: str):
         """Delete all ChromaDB entries for a session."""
         try:

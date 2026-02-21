@@ -194,10 +194,27 @@ export default function AnalyticsPage() {
               <StatCard
                 label="Cards Due Today"
                 value={data.cards_due_today}
-                sub="flashcards to review"
+                sub={data.cards_due_today > 0 ? '→ click to review' : 'all caught up!'}
                 color={data.cards_due_today > 0 ? '#FFAA00' : '#00FF00'}
               />
             </Box>
+
+            {/* Review Queue CTA */}
+            {data.cards_due_today > 0 && (
+              <Box
+                onClick={() => navigate('/review')}
+                sx={{
+                  border: '1px solid #FFAA00', p: 1.5, mb: 3, cursor: 'pointer',
+                  bgcolor: '#0D0D0D', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  '&:hover': { bgcolor: '#1A1400' },
+                }}
+              >
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#FFAA00' }}>
+                  {data.cards_due_today} flashcard{data.cards_due_today !== 1 ? 's' : ''} due for review — start your session now
+                </Typography>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#FFAA00' }}>→</Typography>
+              </Box>
+            )}
 
             {/* Flashcard Mastery */}
             <Box sx={{ border: '1px solid #333', p: 2, mb: 3, bgcolor: '#0D0D0D' }}>

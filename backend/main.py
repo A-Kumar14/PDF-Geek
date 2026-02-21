@@ -126,12 +126,53 @@ ALLOWED_URL_PREFIXES = (
 # ── Health & Personas ──────────────────────────────────────────────────────────
 @app.get("/health")
 async def health_check():
+    # Probe ChromaDB
+    chroma_ok = False
+    try:
+        rag_service.collection.count()
+        chroma_ok = True
+    except Exception as exc:
+        logger.warning("health.chromadb.down", error=str(exc))
+
+    # Probe Redis
+    redis_ok = False
+    try:
+        import redis as _redis
+        from config import Config
+        r = _redis.from_url(Config.REDIS_URL or "redis://localhost:6379")
+        r.ping()
+        redis_ok = True
+    except Exception as exc:
+        logger.warning("health.redis.down", error=str(exc))
+
+    overall = "healthy" if chroma_ok else "degraded"
     return {
-        "status": "healthy",
+        "status": overall,
         "timestamp": datetime.now().isoformat(),
         "version": "5.0.0",
         "celery_available": _celery_available,
+        "chromadb": "ok" if chroma_ok else "unavailable",
+        "redis": "ok" if redis_ok else "unavailable",
     }
+
+
+@app.get("/workers/status")
+async def workers_status():
+    """Report Celery worker availability so the UI can warn users."""
+    if not _celery_available:
+        return {"available": False, "workers": [], "reason": "Celery not configured"}
+    try:
+        i = celery_app.control.inspect(timeout=2.0)
+        active = i.active() or {}
+        worker_names = list(active.keys())
+        return {
+            "available": len(worker_names) > 0,
+            "workers": worker_names,
+            "worker_count": len(worker_names),
+        }
+    except Exception as exc:
+        logger.warning("workers.inspect.failed", error=str(exc))
+        return {"available": False, "workers": [], "reason": str(exc)}
 
 
 @app.get("/personas")
@@ -306,8 +347,11 @@ async def index_session_document(
         return {"task_id": task.id, "status": "queued"}
 
     # Synchronous fallback
+    import unicodedata
     from werkzeug.utils import secure_filename
-    document_id = f"{session_id}_{secure_filename(file_name)}_{datetime.now().strftime('%H%M%S')}"
+    # Strip non-ASCII before handing to secure_filename to prevent ChromaDB key collisions
+    safe_name = unicodedata.normalize("NFKD", file_name).encode("ascii", "ignore").decode("ascii")
+    document_id = f"{session_id}_{secure_filename(safe_name)}_{datetime.now().strftime('%H%M%S')}"
 
     try:
         idx_result = await rag_service.index_from_url_async(
@@ -598,6 +642,66 @@ async def load_flashcard_progress(
     )
     records = prog_result.scalars().all()
     return {"progress": [p.to_dict() for p in records]}
+
+
+@app.get("/flashcards/due")
+async def get_due_flashcards(current_user: CurrentUser, db: DB):
+    """Return all flashcards due for review today (SM-2 next_review_date <= now)."""
+    today = datetime.utcnow()
+
+    # Get all sessions for this user
+    sess_result = await db.execute(
+        select(StudySession.id).where(StudySession.user_id == current_user.id)
+    )
+    session_ids = [row[0] for row in sess_result.fetchall()]
+    if not session_ids:
+        return {"due": [], "total": 0}
+
+    # Fetch due cards
+    due_result = await db.execute(
+        select(FlashcardProgress)
+        .where(
+            FlashcardProgress.session_id.in_(session_ids),
+            FlashcardProgress.next_review_date <= today,
+        )
+        .order_by(FlashcardProgress.next_review_date)
+    )
+    due_records = due_result.scalars().all()
+
+    # Enrich each card with its back text from the originating message artifact
+    enriched = []
+    msg_cache: dict = {}
+    for rec in due_records:
+        card_back = None
+        try:
+            if rec.message_id not in msg_cache:
+                msg_res = await db.execute(
+                    select(ChatMessage).where(ChatMessage.id == rec.message_id)
+                )
+                msg = msg_res.scalar_one_or_none()
+                msg_cache[rec.message_id] = json.loads(msg.artifacts_json or "[]") if msg else []
+
+            artifacts = msg_cache[rec.message_id]
+            for art in artifacts:
+                if art.get("artifact_type") == "flashcards":
+                    cards_data = art.get("content")
+                    if isinstance(cards_data, str):
+                        import json as _json
+                        cards_data = _json.loads(cards_data)
+                    if isinstance(cards_data, dict):
+                        cards_data = cards_data.get("cards", [])
+                    if isinstance(cards_data, list) and len(cards_data) > rec.card_index:
+                        card = cards_data[rec.card_index]
+                        card_back = card.get("back") or card.get("answer") or card.get("definition")
+                    break
+        except Exception as exc:
+            logger.warning(f"flashcards.due.enrich.failed card={rec.id}: {exc}")
+
+        row = rec.to_dict()
+        row["card_back"] = card_back
+        enriched.append(row)
+
+    return {"due": enriched, "total": len(enriched)}
 
 
 # ── Quiz results ───────────────────────────────────────────────────────────────

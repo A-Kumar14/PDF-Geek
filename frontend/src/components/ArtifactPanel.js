@@ -406,6 +406,39 @@ function FlashcardComponent({ data, messageId, sessionId }) {
     setCardStatus(Array(cards.length).fill('remaining'));
   };
 
+  const handleExportAnki = () => {
+    // Anki-compatible CSV: front,back (no header row for Anki import)
+    const rows = cards.map(c => `"${(c.front || '').replace(/"/g, '""')}","${(c.back || '').replace(/"/g, '""')}"`);
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'flashcards_anki.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportMarkdown = () => {
+    // Obsidian-friendly Markdown with WikiLink-style headings
+    const lines = ['# Flashcards\n'];
+    cards.forEach((c, i) => {
+      lines.push(`## Card ${i + 1}`);
+      lines.push(`**Front:** ${c.front || ''}`);
+      lines.push(`**Back:** ${c.back || ''}`);
+      if (c.tags && c.tags.length > 0) {
+        lines.push(`**Tags:** ${c.tags.map(t => `[[${t}]]`).join(', ')}`);
+      }
+      lines.push('');
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'flashcards_obsidian.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const currentStatus = cardStatus[currentIndex];
   const statusColor = {
     remaining: '#888',
@@ -690,6 +723,32 @@ function FlashcardComponent({ data, messageId, sessionId }) {
           }}
         >
           [&gt;]
+        </Button>
+      </Box>
+
+      {/* Export buttons */}
+      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+        <Button
+          onClick={handleExportAnki}
+          size="small"
+          sx={{
+            fontFamily: 'monospace', fontSize: '0.6rem', color: '#555',
+            border: '1px solid #2A2A2A', px: 1.5, py: 0.25,
+            '&:hover': { color: '#E5E5E5', borderColor: '#555' },
+          }}
+        >
+          [ANKI CSV]
+        </Button>
+        <Button
+          onClick={handleExportMarkdown}
+          size="small"
+          sx={{
+            fontFamily: 'monospace', fontSize: '0.6rem', color: '#555',
+            border: '1px solid #2A2A2A', px: 1.5, py: 0.25,
+            '&:hover': { color: '#E5E5E5', borderColor: '#555' },
+          }}
+        >
+          [OBSIDIAN MD]
         </Button>
       </Box>
 
