@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
           <>
             {/* Summary Stats */}
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#888', mb: 1.5, textTransform: 'uppercase' }}>
-              // Overview
+              {'// Overview'}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 3 }}>
               <StatCard
@@ -204,7 +204,7 @@ export default function AnalyticsPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <Layers size={14} color="#888" />
                 <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#888', textTransform: 'uppercase' }}>
-                  // Flashcard Progress
+                  {'// Flashcard Progress'}
                 </Typography>
               </Box>
               {data.total_flashcards === 0 ? (
@@ -225,7 +225,7 @@ export default function AnalyticsPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <BookOpen size={14} color="#888" />
                 <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#888', textTransform: 'uppercase' }}>
-                  // Recent Quizzes
+                  {'// Recent Quizzes'}
                 </Typography>
               </Box>
 
