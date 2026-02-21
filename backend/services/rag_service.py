@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import logging
@@ -125,6 +126,24 @@ class RAGService:
             logger.info(f"Deleted ChromaDB docs for session={session_id}")
         except Exception as e:
             logger.warning(f"ChromaDB session delete failed: {e}")
+
+    async def query_async(
+        self, question: str, session_id: str, user_id: int, n_results: int = 5
+    ) -> Dict:
+        """Async wrapper around the sync query() method (runs in thread pool)."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.query, question, session_id, user_id, n_results
+        )
+
+    async def index_from_url_async(
+        self, url: str, name: str, document_id: str, session_id: str, user_id: int
+    ) -> Dict:
+        """Async wrapper around the sync index_from_url() method."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.index_from_url, url, name, document_id, session_id, user_id
+        )
 
     def build_sources(self, chunks: List[str], metas: List[dict]) -> List[dict]:
         """Build source citation list from RAG results."""

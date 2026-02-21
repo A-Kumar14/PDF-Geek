@@ -245,6 +245,7 @@ export default function CommandPalette() {
 
   const executeCommand = useCallback((cmd) => {
     setOpen(false);
+    setQuery('');
     setTimeout(() => cmd.action(), 50);
   }, []);
 

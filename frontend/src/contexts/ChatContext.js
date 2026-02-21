@@ -32,8 +32,10 @@ export function ChatProvider({ children }) {
   });
   const [artifacts, setArtifacts] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+  const [streamingContent, setStreamingContent] = useState(null);
   const phaseTimerRef = useRef(null);
   const localStorageDebounceRef = useRef(null);
+  const stopGenerationRef = useRef(false);
 
   const { sendMessage: apiSendMessage } = useChat();
   const fileCtx = useFile();
@@ -223,13 +225,27 @@ export function ChatProvider({ children }) {
       // Try server-backed session message first
       if (token && completedFiles.length > 0) {
         try {
+          stopGenerationRef.current = false;
+          let accumulatedContent = '';
+          setStreamingContent('');
           result = await sendSessionMessage(sessionId, {
             question: question.trim(),
             deepThink: deepThinkEnabled,
-            model: selectedModel,  // Pass selected model to backend
+            model: selectedModel,
+            onChunk: (chunk) => {
+              if (stopGenerationRef.current) return;
+              accumulatedContent += chunk;
+              setStreamingContent(accumulatedContent);
+            },
           });
-        } catch {
-          result = null;
+          setStreamingContent(null);
+          // If SSE returned null finalData, build from accumulated
+          if (!result && accumulatedContent) {
+            result = { answer: accumulatedContent, sources: [], artifacts: [], suggestions: [] };
+          }
+        } catch (err) {
+          setStreamingContent(null);
+          throw err;
         }
       }
 
@@ -357,11 +373,11 @@ export function ChatProvider({ children }) {
         suggestions,
         setSuggestions,
         documentIndexing,
-        // Aliases and placeholders for ChatPanel compatibility
+        // Aliases and compatibilty helpers
         addMessage: sendMessage,
         isLoading: loading,
-        streamingContent: null,
-        stopGeneration: () => {},
+        streamingContent,
+        stopGeneration: () => { stopGenerationRef.current = true; setStreamingContent(null); },
       }}
     >
       {children}

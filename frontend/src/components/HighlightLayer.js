@@ -3,13 +3,14 @@ import { Tooltip, Box } from '@mui/material';
 import { useAnnotations } from '../contexts/AnnotationContext';
 
 const HighlightLayer = React.memo(
-  function HighlightLayer({ pageNum, scale }) {
+  function HighlightLayer({ pageNum, scale, sourceHighlights = [] }) {
     const { highlights, comments, removeHighlight, removeComment } = useAnnotations();
 
     const pageHighlights = highlights.filter((h) => h.pageNum === pageNum);
     const pageComments = comments.filter((c) => c.pageNum === pageNum);
+    const pageSourceHighlights = sourceHighlights.filter((s) => s.page === pageNum);
 
-    if (pageHighlights.length === 0 && pageComments.length === 0) return null;
+    if (pageHighlights.length === 0 && pageComments.length === 0 && pageSourceHighlights.length === 0) return null;
 
     return (
       <div
@@ -59,6 +60,25 @@ const HighlightLayer = React.memo(
             </Tooltip>
           ))
         )}
+        {/* Source highlights — green accent from [SRC:N] chip clicks */}
+        {pageSourceHighlights.map((s, si) =>
+          s.rects.map((rect, i) => (
+            <div
+              key={`source-${si}-${i}`}
+              style={{
+                position: 'absolute',
+                left: rect.x * scale,
+                top: rect.y * scale,
+                width: rect.width * scale,
+                height: rect.height * scale,
+                backgroundColor: 'rgba(0,255,136,0.25)',
+                border: '2px solid rgba(0,255,136,0.6)',
+                pointerEvents: 'none',
+              }}
+            />
+          ))
+        )}
+
         {pageComments.map((c) =>
           c.rects.map((rect, i) => (
             <Tooltip
@@ -98,8 +118,12 @@ const HighlightLayer = React.memo(
     );
   },
   (prevProps, nextProps) => {
-    // Only re-render if pageNum or scale changes
-    return prevProps.pageNum === nextProps.pageNum && prevProps.scale === nextProps.scale;
+    // Only re-render if pageNum, scale, or sourceHighlights changes
+    return (
+      prevProps.pageNum === nextProps.pageNum &&
+      prevProps.scale === nextProps.scale &&
+      prevProps.sourceHighlights === nextProps.sourceHighlights
+    );
   }
 );
 

@@ -20,10 +20,18 @@ export default function ChatPanel() {
     streamingContent,
     stopGeneration,
   } = useChatContext();
-  const { file } = useFile();
+  const { file, goToSourcePage } = useFile();
 
   const [input, setInput] = useState('');
   const [showPrompts, setShowPrompts] = useState(true);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleCopy = (id, content) => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {});
+  };
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -76,7 +84,7 @@ export default function ChatPanel() {
           [ SESSION_ACTIVE ]
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#00FF00' }}>
+          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#00FF00', animation: 'statusPulse 2.5s ease-in-out infinite' }}>
             ONLINE
           </Typography>
         </Box>
@@ -145,6 +153,25 @@ export default function ChatPanel() {
                   {msg.role === 'user' ? '[ USER ]' : '[ SYS ]'}
                 </Typography>
 
+                {msg.role === 'assistant' && !msg.isStreaming && (
+                  <Box
+                    onClick={() => handleCopy(msg.id || index, msg.content)}
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      cursor: 'pointer',
+                      color: copiedId === (msg.id || index) ? '#00FF00' : '#555555',
+                      fontFamily: 'monospace',
+                      fontSize: '0.6rem',
+                      fontWeight: 700,
+                      '&:hover': { color: '#E5E5E5' },
+                    }}
+                  >
+                    {copiedId === (msg.id || index) ? '[OK]' : '[CPY]'}
+                  </Box>
+                )}
+
                 {/* Simplified Message Content Rendering */}
                 <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                   {msg.content}
@@ -154,6 +181,31 @@ export default function ChatPanel() {
                   <Box sx={{ display: 'inline-block', ml: 1, width: 8, height: 16, bgcolor: '#00FF00', animation: 'blink 1s step-end infinite' }} />
                 )}
               </Box>
+
+              {/* Source chips — clickable, navigate + highlight PDF */}
+              {msg.role === 'assistant' && !msg.isStreaming && msg.sources?.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {msg.sources.map((src, i) => (
+                    <Box
+                      key={i}
+                      onClick={() => goToSourcePage(src)}
+                      sx={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.65rem',
+                        color: '#00FF88',
+                        border: '1px solid rgba(0,255,136,0.4)',
+                        px: 0.75,
+                        py: 0.25,
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': { bgcolor: 'rgba(0,255,136,0.1)' },
+                      }}
+                    >
+                      [SRC:{src.pages?.[0] || '?'}]
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Box>
           ))
         )}
@@ -245,6 +297,10 @@ export default function ChatPanel() {
       <style>{`
         @keyframes blink {
           50% { opacity: 0; }
+        }
+        @keyframes statusPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
         }
       `}</style>
     </Box>

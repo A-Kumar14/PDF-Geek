@@ -24,12 +24,67 @@ export async function indexDocument(sessionId, { url, name }) {
   return res.data;
 }
 
-export async function sendSessionMessage(sessionId, { question, deepThink }) {
-  const res = await apiClient.post(`/sessions/${sessionId}/messages`, {
-    question,
-    deepThink: !!deepThink,
+export async function sendSessionMessage(sessionId, { question, deepThink, model, onChunk }) {
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const token = localStorage.getItem('filegeek-token');
+
+  const response = await fetch(`${API_URL}/sessions/${sessionId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ question, deepThink: !!deepThink, model }),
   });
-  return res.data;
+
+  if (!response.ok) {
+    let errorMsg = `Server error: ${response.status}`;
+    try {
+      const errData = await response.json();
+      errorMsg = errData.error || errorMsg;
+    } catch {}
+    throw Object.assign(new Error(errorMsg), { response: { status: response.status, data: { error: errorMsg } } });
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+
+  // SSE streaming path
+  if (contentType.includes('text/event-stream') && onChunk && response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalData = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.chunk !== undefined && onChunk) onChunk(data.chunk);
+            if (data.done) finalData = data;
+          } catch {}
+        }
+      }
+    }
+    if (finalData) {
+      return {
+        answer: finalData.answer || '',
+        message_id: finalData.message_id,
+        sources: finalData.sources || [],
+        artifacts: finalData.artifacts || [],
+        suggestions: finalData.suggestions || [],
+      };
+    }
+    return null;
+  }
+
+  // Regular JSON path (Flask fallback / non-streaming)
+  return response.json();
 }
 
 export async function sendFeedback(messageId, feedback) {

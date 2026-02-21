@@ -8,6 +8,7 @@ import HighlightLayer from './HighlightLayer';
 import SelectionToolbar from './SelectionToolbar';
 import StickyNotePanel from './StickyNotePanel';
 import { useAnnotations } from '../contexts/AnnotationContext';
+import { useFile } from '../contexts/FileContext';
 import { getSelectionRectsRelativeTo } from '../utils/selectionUtils';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -107,6 +108,8 @@ function PdfViewer({ file, targetPage, onPageChange }) {
   const pageWrapperRef = useRef(null);
 
   const { addHighlight, addComment, setNotePanelOpen, highlights, notes, comments } = useAnnotations();
+  const { activeSourceHighlight } = useFile();
+  const [computedSourceRects, setComputedSourceRects] = useState([]);
 
   const handleExportAnnotations = useCallback(() => {
     const data = { highlights, notes, comments, exportedAt: new Date().toISOString() };
@@ -139,6 +142,43 @@ function PdfViewer({ file, targetPage, onPageChange }) {
   useEffect(() => {
     if (onPageChange) onPageChange(pageNum, numPages);
   }, [pageNum, numPages, onPageChange]);
+
+  const findTextRectsForExcerpt = useCallback((excerptText) => {
+    const textLayer = pageWrapperRef.current?.querySelector('.react-pdf__Page__textContent');
+    if (!textLayer || !excerptText) return [];
+    const words = excerptText.trim().split(/\s+/).slice(0, 8);
+    const containerRect = pageWrapperRef.current.getBoundingClientRect();
+    return Array.from(textLayer.querySelectorAll('span'))
+      .filter((span) => words.some((w) => span.textContent?.includes(w)))
+      .map((span) => {
+        const r = span.getBoundingClientRect();
+        return {
+          x: (r.left - containerRect.left) / scale,
+          y: (r.top - containerRect.top) / scale,
+          width: r.width / scale,
+          height: r.height / scale,
+        };
+      });
+  }, [scale]);
+
+  // Compute source highlight rects when activeSourceHighlight changes
+  useEffect(() => {
+    if (!activeSourceHighlight || activeSourceHighlight.page !== pageNum) {
+      setComputedSourceRects([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const rects = findTextRectsForExcerpt(activeSourceHighlight.excerpt);
+      setComputedSourceRects(rects.length > 0 ? [{ page: pageNum, rects }] : []);
+      if (rects[0] && pageWrapperRef.current?.parentElement) {
+        pageWrapperRef.current.parentElement.scrollTo({
+          top: rects[0].y * scale - 80,
+          behavior: 'smooth',
+        });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeSourceHighlight, pageNum, scale, findTextRectsForExcerpt]);
 
   const handleHighlight = useCallback(() => {
     if (!pageWrapperRef.current) return;
@@ -317,7 +357,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                     renderAnnotationLayer={true}
                     devicePixelRatio={window.devicePixelRatio || 1}
                   />
-                  <HighlightLayer pageNum={pageNum} scale={scale} />
+                  <HighlightLayer pageNum={pageNum} scale={scale} sourceHighlights={computedSourceRects} />
                 </div>
               </div>
             </div>

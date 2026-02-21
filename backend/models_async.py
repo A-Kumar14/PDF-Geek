@@ -1,0 +1,213 @@
+"""SQLAlchemy 2.x models (async-compatible) for FastAPI."""
+
+import json
+import uuid
+from datetime import datetime
+from typing import Optional, List
+
+from sqlalchemy import (
+    Integer, String, Text, Float, DateTime,
+    ForeignKey, UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from database import Base
+
+
+def _uuid() -> str:
+    return str(uuid.uuid4())
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    sessions: Mapped[List["StudySession"]] = relationship(
+        "StudySession", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class StudySession(Base):
+    __tablename__ = "study_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), default="Untitled Session")
+    persona: Mapped[str] = mapped_column(String(50), default="academic")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="sessions")
+    messages: Mapped[List["ChatMessage"]] = relationship(
+        "ChatMessage", back_populates="session", cascade="all, delete-orphan"
+    )
+    documents: Mapped[List["SessionDocument"]] = relationship(
+        "SessionDocument", back_populates="session", cascade="all, delete-orphan"
+    )
+
+    def to_dict(self, include_messages=False, include_documents=False):
+        d = {
+            "id": self.id,
+            "title": self.title,
+            "persona": self.persona,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if include_messages:
+            d["messages"] = [
+                m.to_dict()
+                for m in sorted(self.messages, key=lambda x: x.created_at)
+            ]
+        if include_documents:
+            d["documents"] = [doc.to_dict() for doc in self.documents]
+        return d
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("study_sessions.id"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    sources_json: Mapped[str] = mapped_column(Text, default="[]")
+    artifacts_json: Mapped[str] = mapped_column(Text, default="[]")
+    suggestions_json: Mapped[str] = mapped_column(Text, default="[]")
+    feedback: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    tool_calls_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    session: Mapped["StudySession"] = relationship("StudySession", back_populates="messages")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "role": self.role,
+            "content": self.content,
+            "sources": json.loads(self.sources_json or "[]"),
+            "artifacts": json.loads(self.artifacts_json or "[]"),
+            "suggestions": json.loads(self.suggestions_json or "[]"),
+            "feedback": self.feedback,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class SessionDocument(Base):
+    __tablename__ = "session_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("study_sessions.id"), nullable=False
+    )
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    file_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    chroma_document_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    page_count: Mapped[int] = mapped_column(Integer, default=0)
+    indexed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    session: Mapped["StudySession"] = relationship("StudySession", back_populates="documents")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "file_name": self.file_name,
+            "file_type": self.file_type,
+            "file_url": self.file_url,
+            "chunk_count": self.chunk_count,
+            "page_count": self.page_count,
+            "indexed_at": self.indexed_at.isoformat() if self.indexed_at else None,
+        }
+
+
+class QuizResult(Base):
+    __tablename__ = "quiz_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("study_sessions.id"), nullable=False
+    )
+    message_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("chat_messages.id"), nullable=False
+    )
+    topic: Mapped[str] = mapped_column(String(255), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_questions: Mapped[int] = mapped_column(Integer, nullable=False)
+    answers_json: Mapped[str] = mapped_column(Text, default="[]")
+    time_taken: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "message_id": self.message_id,
+            "topic": self.topic,
+            "score": self.score,
+            "total_questions": self.total_questions,
+            "answers": json.loads(self.answers_json or "[]"),
+            "time_taken": self.time_taken,
+            "percentage": (
+                round((self.score / self.total_questions * 100), 1)
+                if self.total_questions > 0
+                else 0
+            ),
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class FlashcardProgress(Base):
+    __tablename__ = "flashcard_progress"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("study_sessions.id"), nullable=False
+    )
+    message_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("chat_messages.id"), nullable=False
+    )
+    card_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    card_front: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="remaining")
+    ease_factor: Mapped[float] = mapped_column(Float, default=2.5)
+    interval_days: Mapped[int] = mapped_column(Integer, default=1)
+    next_review_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    review_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "message_id", "card_index", name="_session_message_card_uc"
+        ),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "message_id": self.message_id,
+            "card_index": self.card_index,
+            "card_front": self.card_front,
+            "status": self.status,
+            "ease_factor": self.ease_factor,
+            "interval_days": self.interval_days,
+            "next_review_date": (
+                self.next_review_date.isoformat() if self.next_review_date else None
+            ),
+            "review_count": self.review_count,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }

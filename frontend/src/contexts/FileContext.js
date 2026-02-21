@@ -54,6 +54,7 @@ export function FileProvider({ children }) {
   const [targetPage, setTargetPage] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  const [activeSourceHighlight, setActiveSourceHighlight] = useState(null);
 
   // Backward compat: `file` returns the raw File object for PdfViewer/ImageViewer/TextViewer
   const file = useMemo(() => {
@@ -171,6 +172,12 @@ export function FileProvider({ children }) {
     setTargetPage(pageNum);
   }, []);
 
+  const goToSourcePage = useCallback((source) => {
+    const page = source.pages?.[0] || 1;
+    setTargetPage(page);
+    setActiveSourceHighlight({ excerpt: source.excerpt, page });
+  }, []);
+
   const reportPageChange = useCallback((page, total) => {
     setCurrentPage(page);
     setTotalPages(total);
@@ -189,6 +196,8 @@ export function FileProvider({ children }) {
         retryUpload,
         targetPage,
         goToPage,
+        goToSourcePage,
+        activeSourceHighlight,
         currentPage,
         totalPages,
         reportPageChange,

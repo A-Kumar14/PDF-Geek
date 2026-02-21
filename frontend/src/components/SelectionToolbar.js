@@ -38,13 +38,18 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
   const handleMouseUp = useCallback(() => {
     setTimeout(() => {
       const sel = window.getSelection();
-      if (sel && sel.toString().trim().length > 0) {
-        updatePosition();
-      } else if (!commentMode) {
-        setVisible(false);
+      if (!sel || sel.toString().trim().length === 0) {
+        if (!commentMode) setVisible(false);
+        return;
       }
+      // Only show toolbar when selection is inside the PDF container
+      if (containerRef?.current) {
+        const range = sel.getRangeAt(0);
+        if (!containerRef.current.contains(range.commonAncestorContainer)) return;
+      }
+      updatePosition();
     }, 10);
-  }, [updatePosition, commentMode]);
+  }, [updatePosition, commentMode, containerRef]);
 
   const dismiss = useCallback(() => {
     setVisible(false);
@@ -53,10 +58,8 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
   }, []);
 
   useEffect(() => {
-    const container = containerRef?.current;
-    if (!container) return;
-
-    container.addEventListener('mouseup', handleMouseUp);
+    // Listen on document so toolbar appears even when mouse is released outside the PDF container
+    document.addEventListener('mouseup', handleMouseUp);
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') dismiss();
@@ -74,11 +77,11 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
-      container.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [containerRef, handleMouseUp, dismiss, commentMode]);
+  }, [handleMouseUp, dismiss, commentMode]);
 
   const handleHighlight = () => {
     if (onHighlight) onHighlight();
@@ -129,6 +132,9 @@ export default function SelectionToolbar({ containerRef, onHighlight, onComment,
   return createPortal(
     <Box
       ref={toolbarRef}
+      // Prevent mousedown from clearing the text selection — this is the key fix
+      // that allows onClick handlers to still read window.getSelection()
+      onMouseDown={(e) => e.preventDefault()}
       sx={{
         position: 'fixed',
         top: position.top,
