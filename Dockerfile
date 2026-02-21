@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/ ./backend/
 
-# Create uploads directory
-RUN mkdir -p backend/uploads
+# Create required directories
+RUN mkdir -p backend/uploads backend/instance
 
 # Set working directory to backend so relative imports work
 WORKDIR /app/backend
