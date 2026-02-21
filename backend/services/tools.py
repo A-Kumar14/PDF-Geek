@@ -191,9 +191,12 @@ class ToolExecutor:
 
         # First, search for relevant content
         result = self.rag_service.query(topic, session_id, user_id, n_results=6)
-        context = "\n\n".join(result.get("chunks", []))
+        chunks = result.get("chunks", [])
+        logger.info(f"generate_quiz: session={session_id} chunks_retrieved={len(chunks)} topic={topic!r}")
+        context = "\n\n".join(chunks)
 
         if not context:
+            logger.warning(f"generate_quiz: NO chunks found for session={session_id} topic={topic!r}")
             return {
                 "artifact_type": "quiz",
                 "content": None,
@@ -233,9 +236,12 @@ Example format:
         depth = args.get("depth", "standard")
 
         result = self.rag_service.query(topic, session_id, user_id, n_results=8)
-        context = "\n\n".join(result.get("chunks", []))
+        chunks = result.get("chunks", [])
+        logger.info(f"create_study_guide: session={session_id} chunks_retrieved={len(chunks)} topic={topic!r}")
+        context = "\n\n".join(chunks)
 
         if not context:
+            logger.warning(f"create_study_guide: NO chunks found for session={session_id} topic={topic!r}")
             return {
                 "artifact_type": "study_guide",
                 "content": None,
@@ -275,9 +281,12 @@ Example format:
 
         # Search for relevant content
         result = self.rag_service.query(topic, session_id, user_id, n_results=8)
-        context = "\n\n".join(result.get("chunks", []))
+        chunks = result.get("chunks", [])
+        logger.info(f"generate_flashcards: session={session_id} chunks_retrieved={len(chunks)} topic={topic!r}")
+        context = "\n\n".join(chunks)
 
         if not context:
+            logger.warning(f"generate_flashcards: NO chunks found for session={session_id} topic={topic!r}")
             return {
                 "artifact_type": "flashcards",
                 "content": None,

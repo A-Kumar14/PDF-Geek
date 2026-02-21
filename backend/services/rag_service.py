@@ -97,6 +97,7 @@ class RAGService:
     def query(self, question: str, session_id: str, user_id: int, n_results: int = 5) -> Dict:
         """Session-scoped retrieval. Returns chunks, metas, and image paths."""
         try:
+            # Primary: compound filter by session_id AND user_id
             filter_dict = {
                 "$and": [
                     {"session_id": session_id},
@@ -110,9 +111,26 @@ class RAGService:
                 filter=filter_dict,
             )
 
+            # Fallback: ChromaDB's $and can silently fail with sparse collections.
+            # Retry with session_id-only filter if no chunks were returned.
+            if not results:
+                logger.warning(
+                    f"RAG compound filter returned 0 chunks for session={session_id} "
+                    f"user={user_id} — retrying with session_id-only filter"
+                )
+                results = self.vectorstore.similarity_search(
+                    query=question,
+                    k=n_results,
+                    filter={"session_id": session_id},
+                )
+
             chunks = [doc.page_content for doc in results]
             metas = [doc.metadata for doc in results]
 
+            logger.info(
+                f"RAG query: session={session_id} user={user_id} "
+                f"chunks_returned={len(chunks)} question_prefix={question[:60]!r}"
+            )
             return {"chunks": chunks, "metas": metas}
 
         except Exception as e:

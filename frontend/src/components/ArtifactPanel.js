@@ -742,7 +742,9 @@ function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog }) {
   if (type === 'flashcards' && artifact.content) {
     try {
       const data = typeof artifact.content === 'string' ? JSON.parse(artifact.content) : artifact.content;
-      return <FlashcardComponent data={data} messageId={artifact.message_id} sessionId={artifact.session_id} />;
+      // artifact.session_id is now set by the backend; fall back to the panel's sessionId prop
+      // for older messages that were saved before this fix.
+      return <FlashcardComponent data={data} messageId={artifact.message_id} sessionId={artifact.session_id || sessionId} />;
     } catch {
       return <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', fontFamily: 'monospace', color: '#E5E5E5' }}>{artifact.content}</pre>;
     }

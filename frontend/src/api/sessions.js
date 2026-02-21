@@ -42,7 +42,7 @@ export async function sendSessionMessage(sessionId, { question, deepThink, model
     try {
       const errData = await response.json();
       errorMsg = errData.error || errorMsg;
-    } catch {}
+    } catch { }
     throw Object.assign(new Error(errorMsg), { response: { status: response.status, data: { error: errorMsg } } });
   }
 
@@ -55,6 +55,10 @@ export async function sendSessionMessage(sessionId, { question, deepThink, model
     let buffer = '';
     let finalData = null;
 
+    // Capture artifacts from the early dedicated event so they are not
+    // lost if the connection drops before the final 'done' frame.
+    let earlyArtifacts = [];
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -66,19 +70,31 @@ export async function sendSessionMessage(sessionId, { question, deepThink, model
           try {
             const data = JSON.parse(line.slice(6));
             if (data.chunk !== undefined && onChunk) onChunk(data.chunk);
+            // Capture early artifacts event (emitted before text chunks)
+            if (data.artifacts && !data.done) {
+              earlyArtifacts = data.artifacts;
+            }
             if (data.done) finalData = data;
-          } catch {}
+          } catch { }
         }
       }
     }
     if (finalData) {
+      // Prefer artifacts from done event (most complete); fall back to early capture
+      const artifacts = (finalData.artifacts && finalData.artifacts.length > 0)
+        ? finalData.artifacts
+        : earlyArtifacts;
       return {
         answer: finalData.answer || '',
         message_id: finalData.message_id,
         sources: finalData.sources || [],
-        artifacts: finalData.artifacts || [],
+        artifacts,
         suggestions: finalData.suggestions || [],
       };
+    }
+    // Connection dropped before done — return what we have from early events
+    if (earlyArtifacts.length > 0) {
+      return { answer: '', message_id: null, sources: [], artifacts: earlyArtifacts, suggestions: [] };
     }
     return null;
   }

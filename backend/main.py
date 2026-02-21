@@ -444,9 +444,17 @@ async def send_session_message(
         await db.commit()
         await db.refresh(assistant_msg)
 
-        # Enrich artifacts with message_id
+        # Enrich artifacts with message_id and session_id so the frontend
+        # can persist flash-card progress even before the done event arrives.
         for artifact in artifacts:
             artifact["message_id"] = assistant_msg.id
+            artifact["session_id"] = session_id
+
+        # Emit artifacts as an early dedicated event so they are not lost
+        # if the client disconnects before the final done frame.
+        if artifacts:
+            yield f"data: {json.dumps({'artifacts': artifacts, 'message_id': assistant_msg.id})}\n\n"
+            await asyncio.sleep(0)
 
         # Stream answer in 50-char chunks
         for i in range(0, len(answer), 50):

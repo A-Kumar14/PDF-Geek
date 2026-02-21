@@ -56,6 +56,14 @@ export function ChatProvider({ children }) {
     }
   }, [serverSessions]);
 
+  // Invalidate the active session cache when indexing completes so any
+  // subsequent messages can find the newly indexed document chunks.
+  useEffect(() => {
+    if (documentIndexing.phase === 'completed' && activeSessionId) {
+      queryClient.invalidateQueries({ queryKey: ['session', activeSessionId] });
+    }
+  }, [documentIndexing.phase, activeSessionId, queryClient]);
+
   // Sync to localStorage as offline cache (debounced 500ms to reduce thrashing)
   useEffect(() => {
     if (localStorageDebounceRef.current) {
@@ -174,11 +182,11 @@ export function ChatProvider({ children }) {
       prev.map((s) =>
         s.id === activeSessionId
           ? {
-              ...s,
-              messages: updatedMessages,
-              preview: updatedMessages.find((m) => m.role === 'user')?.content?.slice(0, 60) || '',
-              updated_at: new Date().toISOString(),
-            }
+            ...s,
+            messages: updatedMessages,
+            preview: updatedMessages.find((m) => m.role === 'user')?.content?.slice(0, 60) || '',
+            updated_at: new Date().toISOString(),
+          }
           : s
       )
     );
