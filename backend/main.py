@@ -87,7 +87,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://localhost:3000",
-        "https://file-geek.vercel.app",
+        "https://filegeek.vercel.app",
         *([o for o in (os.getenv("CORS_ORIGINS", "").split(",")) if o.strip()]),
     ],
     allow_origin_regex=r"https://.*\.(vercel\.app|onrender\.com)$",

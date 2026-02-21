@@ -54,7 +54,7 @@ class Config:
     CORS_ORIGINS = [
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://file-geek.vercel.app",
+        "https://filegeek.vercel.app",
         "https://production-domain.com"
     ]
 
