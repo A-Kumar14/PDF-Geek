@@ -440,13 +440,13 @@ class AIService:
         if preference_context:
             system_content += f"\n\nUser preferences: {preference_context}"
         system_content += (
-            "\n\nYou have tools available. Use search_documents to find information from uploaded documents. "
-            "Use generate_quiz when the user asks for a quiz or multiple-choice questions. "
-            "Use generate_flashcards when the user asks for flashcards, flash cards, or spaced repetition study cards. "
-            "Use create_study_guide when the user asks for a study guide or outline. "
-            "Use generate_visualization when the user asks for a diagram or visualization. "
-            "If you cannot find information, state what's missing and suggest 2-3 alternative questions "
-            "in this format: ```suggestions\n[{\"text\": \"...\", \"reason\": \"...\"}]\n```"
+            "\n\nYou have tools available. CRITICAL RULES:\n"
+            "- ALWAYS call generate_flashcards (never answer in text) when the user asks for flashcards, flash cards, study cards, or spaced repetition cards.\n"
+            "- ALWAYS call generate_quiz (never answer in text) when the user asks for a quiz, test, or multiple-choice questions.\n"
+            "- ALWAYS call create_study_guide when the user asks for a study guide or outline.\n"
+            "- ALWAYS call generate_visualization when the user asks for a diagram, chart, or mind map.\n"
+            "- Use search_documents to find information from uploaded documents before answering factual questions.\n"
+            "- DO NOT produce flashcards or quiz questions as plain text. You MUST use the corresponding tool."
         )
         if model_override:
             system_content += "\n\nThink step by step. Be thorough, exhaustive, and analytical."
@@ -462,13 +462,23 @@ class AIService:
         tool_calls_log = []
         max_rounds = 3
 
+        # Detect if the user is explicitly asking for a generative artifact —
+        # in that case force a tool call so the model cannot just answer in text.
+        _q_lower = question.lower()
+        _force_tool_keywords = (
+            "flashcard", "flash card", "study card", "spaced repetition",
+            "quiz", "test me", "multiple choice", "study guide",
+            "diagram", "mind map", "visualization",
+        )
+        _tool_choice = "required" if any(kw in _q_lower for kw in _force_tool_keywords) else "auto"
+
         for _round in range(max_rounds):
             try:
                 response = self._openai_client.chat.completions.create(
                     model=model,
                     messages=messages,
                     tools=TOOL_DEFINITIONS,
-                    tool_choice="auto",
+                    tool_choice=_tool_choice,
                 )
             except Exception as e:
                 logger.error(f"OpenAI agentic call failed: {e}")

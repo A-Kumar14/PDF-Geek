@@ -25,7 +25,7 @@ export async function indexDocument(sessionId, { url, name }) {
 }
 
 export async function sendSessionMessage(sessionId, { question, deepThink, model, onChunk }) {
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
   const token = localStorage.getItem('filegeek-token');
 
   const response = await fetch(`${API_URL}/sessions/${sessionId}/messages`, {
