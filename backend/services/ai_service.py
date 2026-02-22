@@ -462,17 +462,29 @@ class AIService:
         tool_calls_log = []
         max_rounds = 3
 
-        # Detect if the user is explicitly asking for a generative artifact —
-        # in that case force a tool call so the model cannot just answer in text.
+        # Map keyword → exact tool name to force on the first round.
+        # Using {"type": "function", "function": {"name": "..."}} forces the model
+        # to call THAT specific tool — it cannot satisfy the requirement by calling
+        # a different one (e.g. search_documents) and then answering in text.
         _q_lower = question.lower()
-        _force_tool_keywords = (
-            "flashcard", "flash card", "study card", "spaced repetition",
-            "quiz", "test me", "multiple choice", "study guide",
-            "diagram", "mind map", "visualization",
-        )
-        _tool_choice = "required" if any(kw in _q_lower for kw in _force_tool_keywords) else "auto"
+        _forced_tool: str | None = None
+        if any(kw in _q_lower for kw in ("flashcard", "flash card", "study card", "spaced repetition")):
+            _forced_tool = "generate_flashcards"
+        elif any(kw in _q_lower for kw in ("quiz", "test me", "multiple choice", "test my knowledge")):
+            _forced_tool = "generate_quiz"
+        elif any(kw in _q_lower for kw in ("study guide", "outline", "summarize")):
+            _forced_tool = "create_study_guide"
+        elif any(kw in _q_lower for kw in ("diagram", "mind map", "visualization", "chart")):
+            _forced_tool = "generate_visualization"
 
         for _round in range(max_rounds):
+            # Round 0: force the specific tool if one was detected.
+            # Later rounds: fall back to auto so the model can process tool results.
+            if _round == 0 and _forced_tool:
+                _tool_choice = {"type": "function", "function": {"name": _forced_tool}}
+            else:
+                _tool_choice = "auto"
+
             try:
                 response = self._openai_client.chat.completions.create(
                     model=model,
@@ -483,6 +495,7 @@ class AIService:
             except Exception as e:
                 logger.error(f"OpenAI agentic call failed: {e}")
                 return {"answer": "I encountered an error processing your request.", "sources": [], "artifacts": [], "suggestions": []}
+
 
             choice = response.choices[0]
 
