@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Tab, Tabs, Dialog, DialogContent, useMediaQuery, useTheme } from '@mui/material';
+import { Box, Tab, Tabs, Dialog, DialogContent, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import TopBar from '../components/TopBar';
 import ChatPanel from '../components/ChatPanel';

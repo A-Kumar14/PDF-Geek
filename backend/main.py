@@ -473,6 +473,54 @@ async def send_session_message(
         artifacts = ai_result.get("artifacts", [])
         suggestions = ai_result.get("suggestions", [])
 
+        # ── Content extraction ────────────────────────────────────────────────────
+        # The agentic loop returns tools' raw outputs as artifacts (with `instruction`
+        # and `context`), then the model generates the actual card/question JSON in
+        # its answer text. Parse that JSON out and inject it as `content` so the
+        # frontend FlashcardComponent / QuizCard can render it.
+        _json_array_patterns = [
+            r'\[[\s\S]*?\]',  # bare JSON array
+        ]
+        if artifacts:
+            for art in artifacts:
+                if art.get("artifact_type") in ("flashcards", "quiz") and not art.get("content"):
+                    raw_answer = answer
+                    # Try to find the outermost JSON array in the answer
+                    import re as _re
+                    # Walk through all [...] spans and try to parse the longest valid one
+                    parsed_content = None
+                    for m in _re.finditer(r'\[', raw_answer):
+                        start = m.start()
+                        depth = 0
+                        for i, ch in enumerate(raw_answer[start:], start=start):
+                            if ch == '[':
+                                depth += 1
+                            elif ch == ']':
+                                depth -= 1
+                                if depth == 0:
+                                    candidate = raw_answer[start:i + 1]
+                                    try:
+                                        parsed = json.loads(candidate)
+                                        if isinstance(parsed, list) and len(parsed) > 0:
+                                            parsed_content = parsed
+                                    except json.JSONDecodeError:
+                                        pass
+                                    break
+                        if parsed_content:
+                            break
+                    if parsed_content:
+                        art["content"] = parsed_content
+                        logger.info(
+                            f"artifact.content.injected type={art['artifact_type']} "
+                            f"items={len(parsed_content)} session={session_id}"
+                        )
+                    else:
+                        logger.warning(
+                            f"artifact.content.missing type={art['artifact_type']} "
+                            f"answer_len={len(answer)} session={session_id}"
+                        )
+
+
         # Save assistant message
         assistant_msg = ChatMessage(
             session_id=session_id,

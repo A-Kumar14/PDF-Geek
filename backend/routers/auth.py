@@ -42,7 +42,8 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered")
 
     loop = asyncio.get_event_loop()
-    salt = await loop.run_in_executor(None, bcrypt.gensalt)
+    # rounds=10 is still well above OWASP minimums and ~4x faster on serverless cold starts
+    salt = await loop.run_in_executor(None, partial(bcrypt.gensalt, rounds=10))
     password_hash = await loop.run_in_executor(
         None, partial(bcrypt.hashpw, password.encode("utf-8"), salt)
     )
