@@ -156,11 +156,36 @@ class RAGService:
             logger.warning(f"RAG cross-session query failed: {e}")
             return {"chunks": [], "metas": []}
 
-    def delete_session_documents(self, session_id: str):
-        """Delete all ChromaDB entries for a session."""
+    def delete_session_documents(self, session_id: str, user_id: Optional[int] = None):
+        """Delete all ChromaDB entries for a session.
+
+        When user_id is provided a compound filter is applied so that only
+        the calling user's chunks are removed, preventing cross-user orphans.
+        Gracefully falls back to session-only filter if ChromaDB rejects
+        the compound query (e.g. sparse collections).
+        """
         try:
+            if user_id is not None:
+                where_filter = {
+                    "$and": [
+                        {"session_id": session_id},
+                        {"user_id": str(user_id)},
+                    ]
+                }
+                try:
+                    self.collection.delete(where=where_filter)
+                    logger.info(
+                        f"Deleted ChromaDB docs for session={session_id} user={user_id} "
+                        f"(compound filter)"
+                    )
+                    return
+                except Exception as compound_err:
+                    logger.warning(
+                        f"ChromaDB compound delete failed (falling back to session-only): {compound_err}"
+                    )
+            # Fallback: session-only filter
             self.collection.delete(where={"session_id": session_id})
-            logger.info(f"Deleted ChromaDB docs for session={session_id}")
+            logger.info(f"Deleted ChromaDB docs for session={session_id} (session-only filter)")
         except Exception as e:
             logger.warning(f"ChromaDB session delete failed: {e}")
 

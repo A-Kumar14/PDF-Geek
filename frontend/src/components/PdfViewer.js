@@ -70,6 +70,47 @@ const LazyThumbnail = React.memo(
   }
 );
 
+/* ── Lazy wrapper for full PDF pages ── */
+function LazyPageWrapper({ pageNumber, scale, rotate }) {
+  const ref = useRef(null);
+  const [hasRendered, setHasRendered] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setHasRendered(true);
+        }
+      },
+      // Load pages 500px before they enter viewport
+      { rootMargin: '500px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ minHeight: 1000 * scale, width: 800 * scale }}>
+      {hasRendered ? (
+        <Page
+          pageNumber={pageNumber}
+          scale={scale}
+          rotate={rotate}
+          renderTextLayer={true}
+          renderAnnotationLayer={true}
+          devicePixelRatio={window.devicePixelRatio || 1}
+        />
+      ) : (
+        <div style={{ height: 1000 * scale, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontFamily: 'monospace', color: '#888' }}>[ LOADING PAGE {pageNumber} ]</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Text-based toolbar button ── */
 function ToolBtn({ label, onClick, disabled, active, tooltip }) {
   const btn = (
@@ -165,8 +206,6 @@ function PdfViewer({ file, targetPage, onPageChange }) {
     const container = scrollContainerRef.current;
     if (!el || !container) return;
     isScrollingTo.current = true;
-    // Use direct scrollTop assignment — reliable even when scrollIntoView
-    // would scroll the wrong ancestor (e.g. the browser viewport).
     const containerTop = container.getBoundingClientRect().top;
     const elTop = el.getBoundingClientRect().top;
     container.scrollBy({ top: elTop - containerTop - 8, behavior: 'smooth' });
@@ -423,7 +462,7 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                 ))}
               </aside>
 
-              {/* ── Main page view (all pages scrollable) ── */}
+              {/* ── Main page view (lazy rendering) ── */}
               <div className="pdf-container" ref={scrollContainerRef}>
                 {Array.from({ length: numPages }, (_, i) => i + 1).map((n) => (
                   <div
@@ -431,15 +470,17 @@ function PdfViewer({ file, targetPage, onPageChange }) {
                     className="pdf-page-wrapper"
                     data-page={n}
                     ref={(el) => { pageRefs.current[n - 1] = el; }}
-                    style={darkFilter ? { filter: 'invert(0.88) hue-rotate(180deg)' } : undefined}
+                    style={{
+                      ...(darkFilter ? { filter: 'invert(0.88) hue-rotate(180deg)' } : {}),
+                      width: 'fit-content',
+                      margin: '0 auto',
+                      minHeight: 1000 * scale, // Reserve space
+                    }}
                   >
-                    <Page
+                    <LazyPageWrapper
                       pageNumber={n}
                       scale={scale}
                       rotate={rotation}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={true}
-                      devicePixelRatio={window.devicePixelRatio || 1}
                     />
                     <HighlightLayer
                       pageNum={n}

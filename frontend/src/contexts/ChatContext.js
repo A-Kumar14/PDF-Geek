@@ -260,7 +260,7 @@ export function ChatProvider({ children }) {
       // Fall back to legacy flow
       if (!result) {
         const chatHistory = messages.map(({ role, content }) => ({ role, content }));
-        const legacyResult = await apiSendMessage(question, filesToSend, chatHistory, deepThinkEnabled, personaId);
+        const legacyResult = await apiSendMessage(question, filesToSend, chatHistory, deepThinkEnabled, personaId, selectedModel);
         result = {
           answer: legacyResult.answer,
           sources: legacyResult.sources,

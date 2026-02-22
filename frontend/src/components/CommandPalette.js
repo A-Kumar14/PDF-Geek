@@ -19,19 +19,23 @@ import {
   Trash2,
   Upload,
   Keyboard,
-  Pin,
   LogOut,
   Image,
   File,
+  Layout,
+  Minimize2,
+  Palette,
+  BookOpen,
+  Brain,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePersona } from '../contexts/PersonaContext';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
-import { useHighlights } from '../contexts/HighlightsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useThemeMode } from '../theme/ThemeContext';
 
-export default function CommandPalette() {
+export default function CommandPalette({ onOpenDashboard }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -44,7 +48,7 @@ export default function CommandPalette() {
   const { personas, selectPersona } = usePersona();
   const { file, files, activeFileIndex, setActiveFileIndex, removeFile, handleFileSelect } = useFile();
   const { sendMessage, clearMessages, clearAllSessions } = useChatContext();
-  const { toggleNotesPanel } = useHighlights();
+  const { setTheme, setLayoutMode } = useThemeMode();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
@@ -122,14 +126,6 @@ export default function CommandPalette() {
         category: 'ACTIONS',
         action: () => clearAllSessions(),
         priority: 80,
-      },
-      {
-        id: 'toggle-notes',
-        label: 'TOGGLE_RESEARCH_NOTES',
-        icon: <Pin className="w-4 h-4" />,
-        category: 'ACTIONS',
-        action: () => toggleNotesPanel(),
-        priority: 85,
       },
       {
         id: 'logout',
@@ -212,16 +208,96 @@ export default function CommandPalette() {
       });
     });
 
+    // ── Slash Commands ────────────────────────────────────────────────────────
+    // These are always available when typed with a leading /
+    cmds.push(
+      {
+        id: 'slash-quiz',
+        label: '/quiz — Generate quiz from document',
+        icon: <FileQuestion className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => sendMessage('Generate a quiz from this document'),
+        priority: 105,
+        isSlash: true,
+      },
+      {
+        id: 'slash-summarize',
+        label: '/summarize — Summarize this document',
+        icon: <FileText className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => sendMessage('Summarize this document in detail'),
+        priority: 103,
+        isSlash: true,
+      },
+      {
+        id: 'slash-flashcards',
+        label: '/flashcards — Generate flashcards',
+        icon: <Brain className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => sendMessage('Generate flashcards from this document'),
+        priority: 102,
+        isSlash: true,
+      },
+      {
+        id: 'slash-dashboard',
+        label: '/dashboard — Open Document Dashboard',
+        icon: <BookOpen className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => onOpenDashboard?.(),
+        priority: 101,
+        isSlash: true,
+      },
+      // Theme switchers
+      ...['dark', 'light', 'hacker', 'sepia'].map((t) => ({
+        id: `slash-theme-${t}`,
+        label: `/theme ${t} — Switch to ${t.charAt(0).toUpperCase() + t.slice(1)} theme`,
+        icon: <Palette className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => setTheme(t),
+        priority: 98,
+        isSlash: true,
+      })),
+      // Layout modes
+      {
+        id: 'slash-analyst',
+        label: '/analyst — Switch to Analyst Mode (multi-pane)',
+        icon: <Layout className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => setLayoutMode('analyst'),
+        priority: 97,
+        isSlash: true,
+      },
+      {
+        id: 'slash-focus',
+        label: '/focus — Switch to Focus Mode (minimalist)',
+        icon: <Minimize2 className="w-4 h-4" />,
+        category: 'SLASH_COMMANDS',
+        action: () => setLayoutMode('focus'),
+        priority: 96,
+        isSlash: true,
+      },
+    );
+
     return cmds;
-  }, [file, files, activeFileIndex, personas, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, toggleNotesPanel, setActiveFileIndex, handleLogout]);
+  }, [file, files, activeFileIndex, personas, navigate, removeFile, clearMessages, clearAllSessions, sendMessage, selectPersona, setActiveFileIndex, handleLogout, setTheme, setLayoutMode, onOpenDashboard]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) {
+    const trimmed = query.trim();
+
+    // ── Slash command mode: query starts with '/' ─────────────────────────────
+    if (trimmed.startsWith('/')) {
+      const slashQuery = trimmed.toLowerCase();
+      return commands
+        .filter((cmd) => cmd.isSlash && cmd.label.toLowerCase().includes(slashQuery))
+        .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    }
+
+    if (!trimmed) {
       // Sort by priority when no search query
       return [...commands].sort((a, b) => (b.priority || 0) - (a.priority || 0));
     }
 
-    const q = query.toLowerCase();
+    const q = trimmed.toLowerCase();
     return commands
       .filter(
         (cmd) =>

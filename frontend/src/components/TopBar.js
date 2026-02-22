@@ -9,7 +9,6 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Badge,
   Tooltip,
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -21,14 +20,16 @@ import ScienceIcon from '@mui/icons-material/Science';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import PolicyIcon from '@mui/icons-material/Policy';
 import CheckIcon from '@mui/icons-material/Check';
-import PushPinIcon from '@mui/icons-material/PushPin';
+import PaletteIcon from '@mui/icons-material/Palette';
+import PsychologyAltIcon from '@mui/icons-material/PsychologyAlt';
+import HeadphonesIcon from '@mui/icons-material/Headphones';
 import { useNavigate } from 'react-router-dom';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
 import { usePersona } from '../contexts/PersonaContext';
 import { useModelContext } from '../contexts/ModelContext';
-import { useHighlights } from '../contexts/HighlightsContext';
-import DeepThinkToggle from './DeepThinkToggle';
+import { useThemeMode } from '../theme/ThemeContext';
+import { THEME_NAMES } from '../theme/themes';
 
 const PERSONA_ICONS = {
   academic: <SchoolIcon fontSize="small" />,
@@ -45,9 +46,12 @@ export default function TopBar({ onOpenSettings }) {
   const { clearMessages } = useChatContext();
   const { personaId, selectPersona, personas, persona } = usePersona();
   const { selectedModel, setSelectedModel } = useModelContext();
-  const { pinnedNotes, notesPanelOpen, toggleNotesPanel } = useHighlights();
+  const { themeName, setTheme } = useThemeMode();
   const [anchorEl, setAnchorEl] = useState(null);
   const [modelAnchorEl, setModelAnchorEl] = useState(null);
+  const [themeAnchorEl, setThemeAnchorEl] = useState(null);
+  const [socraticMode, setSocraticMode] = useState(false);
+  const [podcastMode, setPodcastMode] = useState(false);
 
   const MODELS = [
     { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', badge: 'FREE' },
@@ -59,6 +63,58 @@ export default function TopBar({ onOpenSettings }) {
   const handleNew = () => {
     removeFile();
     clearMessages();
+  };
+
+  const handleToggleSocratic = () => {
+    const nextState = !socraticMode;
+    setSocraticMode(nextState);
+    if (nextState) {
+      selectPersona('socratic');
+    } else {
+      selectPersona('academic'); // Default fallback
+    }
+  };
+
+  const { activeSessionId, addMessage, startNewSession } = useChatContext();
+  const [generatingPodcast, setGeneratingPodcast] = useState(false);
+
+  const handleGeneratePodcast = async () => {
+    if (generatingPodcast) return;
+    setGeneratingPodcast(true);
+    setPodcastMode(true);
+    try {
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        sessionId = await startNewSession(file?.name || 'Document', 'pdf');
+      }
+      addMessage('user', 'Generate a podcast script summarizing this document.');
+
+      const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const token = localStorage.getItem('filegeek-token');
+
+      const res = await fetch(`${API}/podcast/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          topic: file?.name || 'the document',
+          model: selectedModel
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate podcast');
+
+      addMessage('assistant', data.script);
+    } catch (err) {
+      addMessage('system', `Error generating podcast: ${err.message}`);
+    } finally {
+      setGeneratingPodcast(false);
+      setTimeout(() => setPodcastMode(false), 2000);
+    }
   };
 
   return (
@@ -258,35 +314,92 @@ export default function TopBar({ onOpenSettings }) {
           ))}
         </Menu>
 
-        <DeepThinkToggle />
-
-        {/* Research notes toggle */}
-        <Tooltip title={notesPanelOpen ? 'Close notes' : 'Research notes'}>
+        {/* Theme quick-swap */}
+        <Tooltip title="Theme">
           <IconButton
             size="small"
-            onClick={toggleNotesPanel}
-            aria-label="Toggle research notes"
+            onClick={(e) => setThemeAnchorEl(e.currentTarget)}
+            aria-label="Change theme"
             sx={{
-              color: notesPanelOpen ? '#00FF00' : '#888',
-              bgcolor: notesPanelOpen ? 'rgba(0, 255, 0, 0.1)' : 'transparent',
+              color: '#888',
               '&:hover': { bgcolor: '#333333' },
             }}
           >
-            <Badge
-              badgeContent={pinnedNotes.length}
+            <PaletteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        <Menu
+          anchorEl={themeAnchorEl}
+          open={Boolean(themeAnchorEl)}
+          onClose={() => setThemeAnchorEl(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Box sx={{ px: 2, py: 1 }}>
+            <Typography variant="caption" sx={{ color: '#888', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.65rem' }}>
+              THEME_PRESET
+            </Typography>
+          </Box>
+          {THEME_NAMES.map((t) => (
+            <MenuItem
+              key={t}
+              onClick={() => { setTheme(t); setThemeAnchorEl(null); }}
+              selected={t === themeName}
               sx={{
-                '& .MuiBadge-badge': {
-                  fontSize: '0.6rem',
-                  height: 14,
-                  minWidth: 14,
-                  bgcolor: '#00FF00',
-                  color: '#000',
-                  display: pinnedNotes.length === 0 ? 'none' : 'flex',
+                py: 0.75,
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(0, 255, 0, 0.1)',
+                  borderLeft: '2px solid #00FF00',
                 },
               }}
             >
-              <PushPinIcon fontSize="small" />
-            </Badge>
+              <ListItemText
+                primary={t.toUpperCase()}
+                primaryTypographyProps={{ fontSize: '0.8rem', fontFamily: 'monospace', fontWeight: t === themeName ? 700 : 400 }}
+              />
+              {t === themeName && (
+                <CheckIcon sx={{ fontSize: 14, color: '#00FF00', ml: 1 }} />
+              )}
+            </MenuItem>
+          ))}
+        </Menu>
+
+        {/* Socratic Tutor Mode toggle */}
+        <Tooltip title="Active Recall (Socratic Tutor)">
+          <IconButton
+            size="small"
+            onClick={handleToggleSocratic}
+            sx={{
+              color: socraticMode ? 'var(--accent)' : '#888',
+              bgcolor: socraticMode ? 'var(--accent-dim)' : 'transparent',
+              border: `1px solid ${socraticMode ? 'var(--accent)' : 'transparent'}`,
+              borderRadius: '4px',
+              p: 0.5,
+              '&:hover': { bgcolor: socraticMode ? 'var(--bg-hover)' : '#333333' },
+            }}
+          >
+            <PsychologyAltIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        {/* Podcast Mode toggle */}
+        <Tooltip title={generatingPodcast ? "Generating..." : "Generate Podcast Summary"}>
+          <IconButton
+            size="small"
+            onClick={handleGeneratePodcast}
+            disabled={generatingPodcast}
+            sx={{
+              color: podcastMode ? '#FF00FF' : '#888',
+              bgcolor: podcastMode ? 'rgba(255, 0, 255, 0.1)' : 'transparent',
+              border: `1px solid ${podcastMode ? '#FF00FF' : 'transparent'}`,
+              borderRadius: '4px',
+              p: 0.5,
+              opacity: generatingPodcast ? 0.5 : 1,
+              '&:hover': { bgcolor: podcastMode ? 'rgba(255, 0, 255, 0.2)' : '#333333' },
+            }}
+          >
+            <HeadphonesIcon fontSize="small" />
           </IconButton>
         </Tooltip>
 

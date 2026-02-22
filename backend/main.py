@@ -300,8 +300,9 @@ async def delete_session(session_id: str, current_user: CurrentUser, db: DB):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Pass user_id so compound filter prevents cross-user vector orphans
     await asyncio.get_event_loop().run_in_executor(
-        None, rag_service.delete_session_documents, session_id
+        None, rag_service.delete_session_documents, session_id, current_user.id
     )
     await db.delete(session)
     await db.commit()
@@ -750,6 +751,196 @@ async def get_due_flashcards(current_user: CurrentUser, db: DB):
         enriched.append(row)
 
     return {"due": enriched, "total": len(enriched)}
+
+
+# ── Flashcard & Quiz direct-generate (migrated from Flask app.py) ─────────────
+@app.post("/flashcards/generate")
+@limiter.limit("10/minute")
+async def generate_flashcards_direct(
+    request: Request, current_user: CurrentUser, db: DB
+):
+    """Generate flashcards directly from session documents, bypassing the agentic loop.
+
+    Body: { session_id, topic (optional), num_cards (optional, default 8) }
+    """
+    data = await request.json()
+    session_id = data.get("session_id")
+    topic = (data.get("topic") or "").strip() or "the document"
+    num_cards = min(int(data.get("num_cards", 8)), 20)
+
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
+
+    sess_result = await db.execute(
+        select(StudySession).where(
+            StudySession.id == session_id, StudySession.user_id == current_user.id
+        )
+    )
+    if not sess_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Session not found or not authorized")
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None,
+        lambda: tool_executor.execute(
+            "generate_flashcards",
+            {"topic": topic, "num_cards": num_cards, "card_type": "mixed"},
+            session_id,
+            current_user.id,
+        ),
+    )
+
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    content = result.get("content")
+    if not content:
+        raise HTTPException(
+            status_code=422,
+            detail="No document content found. Upload and index a document first.",
+        )
+
+    return {
+        "cards": content,
+        "topic": result.get("topic", topic),
+        "card_type": result.get("card_type", "mixed"),
+        "total": len(content),
+    }
+
+
+@app.post("/quiz/generate")
+@limiter.limit("10/minute")
+async def generate_quiz_direct(
+    request: Request, current_user: CurrentUser, db: DB
+):
+    """Generate a quiz directly from session documents (bypasses agentic loop)."""
+    data = await request.json()
+    session_id = data.get("session_id")
+    topic = (data.get("topic") or "").strip() or "the document"
+    num_questions = min(int(data.get("num_cards", data.get("num_questions", 5))), 10)
+
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
+
+    sess_result = await db.execute(
+        select(StudySession).where(
+            StudySession.id == session_id, StudySession.user_id == current_user.id
+        )
+    )
+    if not sess_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Session not found or not authorized")
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None,
+        lambda: tool_executor.execute(
+            "generate_quiz",
+            {"topic": topic, "num_questions": num_questions},
+            session_id,
+            current_user.id,
+        ),
+    )
+
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    content = result.get("content")
+    if not content:
+        raise HTTPException(
+            status_code=422,
+            detail="No document content found. Upload and index a document first.",
+        )
+
+    return {"questions": content, "topic": result.get("topic", topic), "total": len(content)}
+
+
+# ── Session activity feed ──────────────────────────────────────────────────────
+@app.get("/sessions/{session_id}/activity")
+async def get_session_activity(session_id: str, current_user: CurrentUser, db: DB):
+    """Aggregate activity (messages, quiz results, flashcard progress) for the Document Dashboard."""
+    sess_result = await db.execute(
+        select(StudySession).where(
+            StudySession.id == session_id, StudySession.user_id == current_user.id
+        )
+    )
+    session = sess_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Recent messages (ai exchanges only)
+    msgs_result = await db.execute(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id, ChatMessage.role == "assistant")
+        .order_by(ChatMessage.created_at.desc())
+        .limit(20)
+    )
+    messages = msgs_result.scalars().all()
+
+    # Quiz results for session
+    quiz_res = await db.execute(
+        select(QuizResult).where(QuizResult.session_id == session_id).order_by(QuizResult.created_at.desc())
+    )
+    quizzes = quiz_res.scalars().all()
+
+    # Flashcard progress for session
+    fc_res = await db.execute(
+        select(FlashcardProgress).where(FlashcardProgress.session_id == session_id)
+    )
+    fc_records = fc_res.scalars().all()
+    known = sum(1 for r in fc_records if r.status == "known")
+    reviewing = sum(1 for r in fc_records if r.status == "reviewing")
+
+    return {
+        "session_id": session_id,
+        "recent_messages": [
+            {"id": m.id, "content": m.content[:200], "created_at": m.created_at.isoformat()}
+            for m in messages
+        ],
+        "quiz_results": [q.to_dict() for q in quizzes],
+        "flashcard_summary": {
+            "total": len(fc_records),
+            "known": known,
+            "reviewing": reviewing,
+            "remaining": len(fc_records) - known - reviewing,
+        },
+    }
+
+
+# ── Flashcard mastery summary (for Heatmap) ────────────────────────────────────
+@app.get("/flashcards/progress/summary/{session_id}")
+async def get_flashcard_mastery_summary(session_id: str, current_user: CurrentUser, db: DB):
+    """Return per-card mastery data grouped by message_id for the MasteryHeatmap."""
+    sess_result = await db.execute(
+        select(StudySession).where(
+            StudySession.id == session_id, StudySession.user_id == current_user.id
+        )
+    )
+    if not sess_result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    fc_res = await db.execute(
+        select(FlashcardProgress)
+        .where(FlashcardProgress.session_id == session_id)
+        .order_by(FlashcardProgress.message_id, FlashcardProgress.card_index)
+    )
+    records = fc_res.scalars().all()
+
+    # Group by message_id
+    groups: dict = {}
+    for r in records:
+        mid = str(r.message_id)
+        if mid not in groups:
+            groups[mid] = {"message_id": r.message_id, "cards": []}
+        groups[mid]["cards"].append({
+            "card_index": r.card_index,
+            "front": r.card_front,
+            "status": r.status,
+            "ease_factor": r.ease_factor,
+            "review_count": r.review_count,
+            "next_review_date": r.next_review_date.isoformat() if r.next_review_date else None,
+        })
+
+    return {"session_id": session_id, "groups": list(groups.values())}
 
 
 # ── Quiz results ───────────────────────────────────────────────────────────────

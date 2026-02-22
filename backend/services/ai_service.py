@@ -6,7 +6,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_core.embeddings import Embeddings as LCEmbeddings
+# NOTE: langchain_google_genai is NOT used for embeddings — its default v1beta endpoint
+# dropped support for text-embedding-004. We use a direct REST call to the stable v1 API.
 
 load_dotenv()
 
@@ -16,6 +18,93 @@ logger = logging.getLogger(__name__)
 # Set AI_PROVIDER=gemini or AI_PROVIDER=openai in .env (default: auto-detect)
 
 _provider = os.getenv("AI_PROVIDER", "").lower()
+
+
+# langchain_google_genai@2.x hardcodes the v1beta endpoint which dropped
+# text-embedding-004. We call the stable v1 REST API directly.
+
+class GeminiV1Embeddings(LCEmbeddings):
+    """Langchain-compatible embeddings that call the Gemini REST API directly.
+
+    Extends ``langchain_core.embeddings.Embeddings`` so that langchain_chroma
+    and other Langchain integrations recognise this as a native embeddings
+    provider and call ``embed_documents`` / ``embed_query`` without any
+    intermediate wrapping or fallback.
+
+    Bypasses langchain_google_genai's hardcoded endpoint configuration.
+    Set ``api_version`` to ``'v1beta'`` (default) or ``'v1'`` to match what
+    your API key / account supports.  Use ``ListModels`` to discover which
+    embedding models are available on your key.
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "models/gemini-embedding-001",
+        api_version: str = "v1beta",
+    ):
+        import requests as _requests
+        self._requests = _requests
+        self.api_key = api_key
+        self.api_version = api_version
+        # Normalise: strip leading 'models/' — we always prefix it ourselves
+        bare = model.replace("models/", "", 1)
+        self.model = bare
+        self._batch_url = (
+            f"https://generativelanguage.googleapis.com/{api_version}/models/{bare}:batchEmbedContents"
+        )
+        self._embed_url = (
+            f"https://generativelanguage.googleapis.com/{api_version}/models/{bare}:embedContent"
+        )
+
+    def _batch_embed(self, texts: List[str]) -> List[List[float]]:
+        payload = {
+            "requests": [
+                {
+                    "model": f"models/{self.model}",
+                    "content": {"parts": [{"text": t}]},
+                    "task_type": "RETRIEVAL_DOCUMENT",
+                }
+                for t in texts
+            ]
+        }
+        resp = self._requests.post(
+            self._batch_url,
+            params={"key": self.api_key},
+            json=payload,
+            timeout=60,
+        )
+        if not resp.ok:
+            raise RuntimeError(f"Error embedding content: {resp.status_code} {resp.text}")
+        data = resp.json()
+        # batchEmbedContents response: {"embeddings": [{"values": [...], ...}]}
+        # NOT {"embeddings": [{"embedding": {"values": [...]}}]} — that's the single embedContent format
+        return [item["values"] for item in data["embeddings"]]
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed a list of documents (batched to 100 per call)."""
+        results = []
+        for i in range(0, len(texts), 100):
+            results.extend(self._batch_embed(texts[i : i + 100]))
+        return results
+
+    def embed_query(self, text: str) -> List[float]:
+        """Embed a single query string."""
+        payload = {
+            "model": f"models/{self.model}",
+            "content": {"parts": [{"text": text}]},
+            "task_type": "RETRIEVAL_QUERY",
+        }
+        resp = self._requests.post(
+            self._embed_url,
+            params={"key": self.api_key},
+            json=payload,
+            timeout=60,
+        )
+        if not resp.ok:
+            raise RuntimeError(f"Error embedding query: {resp.status_code} {resp.text}")
+        return resp.json()["embedding"]["values"]
+
 
 if _provider == "gemini":
     AI_PROVIDER = "gemini"
@@ -38,6 +127,7 @@ if AI_PROVIDER == "gemini":
     import google.generativeai as genai  # noqa: F811
 elif AI_PROVIDER == "openai":
     from openai import OpenAI  # noqa: F811
+
 
 
 # ── Persona definitions ────────────────────────────────────────────────
@@ -198,7 +288,13 @@ class AIService:
     # Gemini models
     GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.0-flash")
     GEMINI_RESPONSE_MODEL = os.getenv("GEMINI_RESPONSE_MODEL", "gemini-2.0-flash")
-    GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
+    # Use the bare model name (without 'models/' prefix); GeminiV1Embeddings adds it.
+    # Override with GEMINI_EMBEDDING_MODEL env var to switch models.
+    # Only 'models/gemini-embedding-001' is available by default on free-tier API keys (v1beta).
+    # If you have access to text-embedding-004, set:
+    #   GEMINI_EMBEDDING_MODEL=text-embedding-004  GEMINI_EMBEDDING_API_VERSION=v1
+    GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+    GEMINI_EMBEDDING_API_VERSION = os.getenv("GEMINI_EMBEDDING_API_VERSION", "v1beta")
 
     # OpenAI models
     OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o")
@@ -211,34 +307,54 @@ class AIService:
 
     def __init__(self):
         self.provider = AI_PROVIDER
-        self._openai_client = None
+        self._openai_client_instance = None
+        self._gemini_configured = False
 
         if self.provider == "gemini":
             api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
             if not api_key:
-                raise ValueError("GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable is required")
-            genai.configure(api_key=api_key)
-            self.embeddings = GoogleGenerativeAIEmbeddings(
-                model=self.GEMINI_EMBEDDING_MODEL,
-                google_api_key=api_key,
-            )
+                logger.warning("Gemini API key not found. Embeddings will fail if called.")
+            else:
+                # We do not globally configure genai here to avoid crashing if it's missing but not used
+                self.embeddings = GeminiV1Embeddings(
+                    api_key=api_key,
+                    model=self.GEMINI_EMBEDDING_MODEL,
+                    api_version=self.GEMINI_EMBEDDING_API_VERSION,
+                )
         else:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable is required")
-            self._openai_client = OpenAI(api_key=api_key)
-            self.embeddings = OpenAIEmbeddings(
-                model=self.OPENAI_EMBEDDING_MODEL,
-                openai_api_key=api_key,
-            )
+                logger.warning("OPENAI API key not found. Embeddings will fail if called.")
+            else:
+                self.embeddings = OpenAIEmbeddings(
+                    model=self.OPENAI_EMBEDDING_MODEL,
+                    openai_api_key=api_key,
+                )
+
+    @property
+    def openai_client(self):
+        if self._openai_client_instance is None:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable is required to use OpenAI models.")
+            from openai import OpenAI as _OpenAI
+            self._openai_client_instance = _OpenAI(api_key=api_key)
+        return self._openai_client_instance
+
+    @property
+    def gemini_client(self):
+        if not self._gemini_configured:
+            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable is required to use Gemini models.")
+            genai.configure(api_key=api_key)
+            self._gemini_configured = True
+        return genai
 
     @property
     def client(self):
         """Backward compat: returns OpenAI client for TTS etc."""
-        if self._openai_client is None and os.getenv("OPENAI_API_KEY"):
-            from openai import OpenAI as _OpenAI
-            self._openai_client = _OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        return self._openai_client
+        return self.openai_client
 
     # ── Answer from context ─────────────────────────────────────────────
     def answer_from_context(
@@ -251,16 +367,49 @@ class AIService:
         file_type: str = "pdf",
         image_paths: Optional[List[str]] = None,
     ) -> Optional[str]:
-        if self.provider == "gemini":
-            return self._answer_gemini(
-                context_chunks, question, chat_history,
-                model_override, persona, file_type, image_paths,
-            )
-        else:
-            return self._answer_openai(
-                context_chunks, question, chat_history,
-                model_override, persona, file_type, image_paths,
-            )
+        provider = self.provider
+        if model_override:
+            if model_override.startswith("gpt") or model_override.startswith("o"):
+                provider = "openai"
+            elif model_override.startswith("gemini"):
+                provider = "gemini"
+            else:
+                logger.warning(f"Unmapped model_override '{model_override}', falling back to {provider}")
+
+        try:
+            if provider == "gemini":
+                # Ensure client is available
+                _ = self.gemini_client
+                return self._answer_gemini(
+                    context_chunks, question, chat_history,
+                    model_override, persona, file_type, image_paths,
+                )
+            else:
+                _ = self.openai_client
+                return self._answer_openai(
+                    context_chunks, question, chat_history,
+                    model_override, persona, file_type, image_paths,
+                )
+        except Exception as e:
+            logger.error(f"Failed to use provider {provider}: {str(e)}. Falling back to default provider {self.provider}")
+            
+            # Fallback to default configured provider if custom override failed
+            if provider != self.provider:
+                try:
+                    if self.provider == "gemini":
+                        return self._answer_gemini(
+                            context_chunks, question, chat_history,
+                            None, persona, file_type, image_paths, # Force default model
+                        )
+                    else:
+                        return self._answer_openai(
+                            context_chunks, question, chat_history,
+                            None, persona, file_type, image_paths,
+                        )
+                except Exception as fallback_e:
+                    logger.error(f"Fallback generation failed: {str(fallback_e)}")
+            
+            return f"System Error: Unable to communicate with the AI provider. {str(e)}"
 
     # ── Gemini implementation ───────────────────────────────────────────
     def _answer_gemini(
@@ -284,7 +433,8 @@ class AIService:
                 system_instruction += "\n\nThink step by step. Be thorough, exhaustive, and analytical."
 
             model_name = model_override or self.GEMINI_CHAT_MODEL
-            model = genai.GenerativeModel(
+            gemini_genai = self.gemini_client
+            model = gemini_genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_instruction,
             )
@@ -389,7 +539,7 @@ class AIService:
                 messages.append({"role": "user", "content": text_part})
 
             model = model_override or self.OPENAI_CHAT_MODEL
-            response = self._openai_client.chat.completions.create(
+            response = self.openai_client.chat.completions.create(
                 model=model,
                 messages=messages,
             )
@@ -416,7 +566,16 @@ class AIService:
         preference_context: str = "",
     ) -> Dict:
         """Agentic loop: send message, handle tool calls, return final answer + artifacts."""
-        if self.provider == "gemini":
+        provider = self.provider
+        if model_override:
+            if model_override.startswith("gpt") or model_override.startswith("o"):
+                provider = "openai"
+            elif model_override.startswith("gemini"):
+                provider = "gemini"
+            else:
+                logger.warning(f"Unmapped model_override '{model_override}', falling back to {provider}")
+
+        if provider == "gemini":
             return self._agentic_gemini(
                 question, chat_history, tool_executor, session_id, user_id,
                 persona, file_type, model_override, memory_context, preference_context,
@@ -486,7 +645,7 @@ class AIService:
                 _tool_choice = "auto"
 
             try:
-                response = self._openai_client.chat.completions.create(
+                response = self.openai_client.chat.completions.create(
                     model=model,
                     messages=messages,
                     tools=TOOL_DEFINITIONS,
@@ -508,6 +667,9 @@ class AIService:
                         fn_args = json.loads(tc.function.arguments)
                     except json.JSONDecodeError:
                         fn_args = {}
+
+                    if model_override:
+                        fn_args["model"] = model_override
 
                     result = tool_executor.execute(fn_name, fn_args, session_id, user_id)
                     tool_calls_log.append({"tool": fn_name, "args": fn_args, "result_keys": list(result.keys())})
@@ -533,7 +695,7 @@ class AIService:
 
         # Max rounds reached — get final response
         try:
-            response = self._openai_client.chat.completions.create(
+            response = self.openai_client.chat.completions.create(
                 model=model,
                 messages=messages,
             )
@@ -575,7 +737,8 @@ class AIService:
             system_instruction += "\n\nThink step by step. Be thorough, exhaustive, and analytical."
 
         model_name = model_override or self.GEMINI_CHAT_MODEL
-        model = genai.GenerativeModel(
+        gemini_genai = self.gemini_client
+        model = gemini_genai.GenerativeModel(
             model_name=model_name,
             system_instruction=system_instruction,
             tools=[{"function_declarations": GEMINI_TOOL_DEFINITIONS}],
@@ -615,6 +778,9 @@ class AIService:
                     has_function_call = True
                     fn_name = part.function_call.name
                     fn_args = dict(part.function_call.args) if part.function_call.args else {}
+                    
+                    if model_override:
+                        fn_args["model"] = model_override
 
                     result = tool_executor.execute(fn_name, fn_args, session_id, user_id)
                     tool_calls_log.append({"tool": fn_name, "args": fn_args, "result_keys": list(result.keys())})

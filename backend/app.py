@@ -267,6 +267,18 @@ def s3_presign():
 
     return jsonify({"uploadUrl": upload_url, "key": key, "fileUrl": file_url}), 200
 
+def sanitize_model(model_str: str) -> str:
+    """Normalize and map UI model strings to core internal SDK identifiers."""
+    if not model_str:
+        return None
+    mapping = {
+        "gpt-4o": "gpt-4o",
+        "gpt-4o-mini": "gpt-4o-mini",
+        "gemini-2.0-flash": "gemini-2.0-flash",
+        "gemini-2.5-pro": "gemini-1.5-pro",  # fallback if 2.5 is UI placeholder
+    }
+    return mapping.get(model_str.lower(), model_str)
+
 
 # =========================================================
 # SESSION ENDPOINTS
@@ -423,7 +435,7 @@ def send_session_message(session_id):
 
     deep_think = bool(data.get("deepThink", False))
     use_async = bool(data.get("async", False))
-    custom_model = data.get("model")  # Optional model selection from frontend
+    custom_model = sanitize_model(data.get("model"))  # Optional model selection from frontend
 
     # Save user message
     user_msg = ChatMessage(session_id=session_id, role="user", content=question)
@@ -458,28 +470,47 @@ def send_session_message(session_id):
         logger.warning("memory.retrieval.failed", error=str(e))
 
     # Agentic RAG pipeline
-    result = ai_service.answer_with_tools(
-        question=question,
-        chat_history=chat_history,
-        tool_executor=tool_executor,
-        session_id=session_id,
-        user_id=user_id,
-        persona=session.persona or "academic",
-        file_type="pdf",
-        model_override=model_override,
-        memory_context=memory_context,
-        preference_context=preference_context,
-    )
+    try:
+        result = ai_service.answer_with_tools(
+            question=question,
+            chat_history=chat_history,
+            tool_executor=tool_executor,
+            session_id=session_id,
+            user_id=user_id,
+            persona=session.persona or "academic",
+            file_type="pdf",
+            model_override=model_override,
+            memory_context=memory_context,
+            preference_context=preference_context,
+        )
+        answer = result.get("answer", "")
+        sources = result.get("sources", [])
+        artifacts = result.get("artifacts", [])
+        suggestions = result.get("suggestions", [])
+        tool_calls = result.get("tool_calls", [])
+    except Exception as pipeline_err:
+        import traceback
+        logger.error(
+            "session.message.pipeline.failed",
+            session_id=session_id,
+            error=str(pipeline_err),
+            traceback=traceback.format_exc(),
+        )
+        answer = (
+            "⚠️ An internal error occurred while processing your request. "
+            "The document may need to be re-uploaded. Please try again."
+        )
+        sources, artifacts, suggestions, tool_calls = [], [], [], []
 
     # Save assistant message
     assistant_msg = ChatMessage(
         session_id=session_id,
         role="assistant",
-        content=result.get("answer", ""),
-        sources_json=json.dumps(result.get("sources", [])),
-        artifacts_json=json.dumps(result.get("artifacts", [])),
-        suggestions_json=json.dumps(result.get("suggestions", [])),
-        tool_calls_json=json.dumps(result.get("tool_calls", [])),
+        content=answer,
+        sources_json=json.dumps(sources),
+        artifacts_json=json.dumps(artifacts),
+        suggestions_json=json.dumps(suggestions),
+        tool_calls_json=json.dumps(tool_calls),
     )
     db.session.add(assistant_msg)
 
@@ -488,17 +519,17 @@ def send_session_message(session_id):
     db.session.commit()
 
     # Enrich artifacts with message_id for frontend tracking
-    artifacts = result.get("artifacts", [])
     for artifact in artifacts:
         artifact["message_id"] = assistant_msg.id
 
     return jsonify({
         "message_id": assistant_msg.id,
-        "answer": result.get("answer", ""),
-        "sources": result.get("sources", []),
+        "answer": answer,
+        "sources": sources,
         "artifacts": artifacts,
-        "suggestions": result.get("suggestions", []),
+        "suggestions": suggestions,
     }), 200
+
 
 
 @app.route("/messages/<int:message_id>/feedback", methods=["POST"])
@@ -660,6 +691,7 @@ def generate_flashcards_direct():
     session_id = data.get("session_id")
     topic = (data.get("topic") or "").strip() or "the document"
     num_cards = min(int(data.get("num_cards", 8)), 20)
+    custom_model = sanitize_model(data.get("model"))
 
     if not session_id:
         return jsonify({"error": "session_id is required"}), 400
@@ -671,7 +703,7 @@ def generate_flashcards_direct():
     # Call the tool directly — no LLM tool-calling involved
     result = tool_executor.execute(
         "generate_flashcards",
-        {"topic": topic, "num_cards": num_cards, "card_type": "mixed"},
+        {"topic": topic, "num_cards": num_cards, "card_type": "mixed", "model": custom_model},
         session_id,
         user_id,
     )
@@ -702,6 +734,7 @@ def generate_quiz_direct():
     session_id = data.get("session_id")
     topic = (data.get("topic") or "").strip() or "the document"
     num_questions = min(int(data.get("num_cards", data.get("num_questions", 5))), 10)
+    custom_model = sanitize_model(data.get("model"))
 
     if not session_id:
         return jsonify({"error": "session_id is required"}), 400
@@ -712,7 +745,7 @@ def generate_quiz_direct():
 
     result = tool_executor.execute(
         "generate_quiz",
-        {"topic": topic, "num_questions": num_questions},
+        {"topic": topic, "num_questions": num_questions, "model": custom_model},
         session_id,
         user_id,
     )
@@ -728,6 +761,56 @@ def generate_quiz_direct():
         "questions": content,
         "topic": result.get("topic", topic),
         "total": len(content),
+    }), 200
+
+
+@app.route("/podcast/generate", methods=["POST"])
+@jwt_required
+@limiter.limit("5/minute")
+def generate_podcast_direct():
+    """Generate a podcast script directly from session documents."""
+    user_id = _get_user_id()
+    data = request.get_json(silent=True) or {}
+
+    session_id = data.get("session_id")
+    topic = (data.get("topic") or "").strip() or "the entire document"
+    custom_model = sanitize_model(data.get("model"))
+
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+
+    session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
+    if not session:
+        return jsonify({"error": "Session not found or not authorized"}), 404
+
+    # Use RAG to fetch context
+    result = rag_service.query(topic, session_id, user_id, n_results=10)
+    chunks = result.get("chunks", [])
+    context = "\n\n".join(chunks)
+
+    if not context:
+        return jsonify({"error": "No document content found to generate a podcast."}), 422
+
+    instruction = f"""Write a compelling 2-person podcast script discussing the topic: '{topic}' based on the provided context.
+The hosts are 'Host 1 (Curious, asks questions)' and 'Host 2 (Expert, explains concepts)'.
+Include sound effects directions in brackets like [upbeat intro music].
+Format the script in Markdown."""
+
+    script = ai_service.answer_from_context(
+        context_chunks=[context],
+        question=instruction,
+        chat_history=[],
+        model_override=custom_model,
+        persona="casual"
+    )
+
+    if not script:
+        return jsonify({"error": "Failed to generate podcast script."}), 500
+
+    return jsonify({
+        "artifact_type": "podcast_script",
+        "script": script,
+        "topic": topic,
     }), 200
 
 
@@ -830,7 +913,8 @@ def upload_file():
 
         deep_think = (request.form.get("deepThink", "") or "").lower() == "true"
         n_chunks = Config.DEEP_THINK_CHUNKS if deep_think else Config.NUM_RETRIEVAL_CHUNKS
-        model_override = AIService.RESPONSE_MODEL if deep_think else None
+        custom_model = sanitize_model(request.form.get("model"))
+        model_override = custom_model or (AIService.RESPONSE_MODEL if deep_think else None)
         persona = (request.form.get("persona", "") or "").strip() or "academic"
 
         all_chunks_with_pages = []
@@ -974,7 +1058,8 @@ def ask():
 
         deep_think = bool(data.get("deepThink", False))
         n_chunks = Config.DEEP_THINK_CHUNKS if deep_think else Config.NUM_RETRIEVAL_CHUNKS
-        model_override = AIService.RESPONSE_MODEL if deep_think else None
+        custom_model = sanitize_model(data.get("model"))
+        model_override = custom_model or (AIService.RESPONSE_MODEL if deep_think else None)
         persona = (data.get("persona") or "").strip() or "academic"
 
         all_chunks_with_pages = []

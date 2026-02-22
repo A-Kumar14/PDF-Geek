@@ -188,6 +188,7 @@ class ToolExecutor:
     def _generate_quiz(self, args: dict, session_id: str, user_id: int) -> dict:
         topic = args.get("topic", "the document content")
         num_questions = min(args.get("num_questions", 5), 10)
+        model_override = args.get("model")
 
         # First, search for relevant content
         result = self.rag_service.query(topic, session_id, user_id, n_results=6)
@@ -229,6 +230,7 @@ Example format:
             context_chunks=[context],
             question=instruction,
             chat_history=[],
+            model_override=model_override,
             persona="academic",
         )
         content = self._parse_json_array(raw, "quiz", session_id)
@@ -243,6 +245,7 @@ Example format:
     def _create_study_guide(self, args: dict, session_id: str, user_id: int) -> dict:
         topic = args.get("topic", "the document content")
         depth = args.get("depth", "standard")
+        model_override = args.get("model")
 
         result = self.rag_service.query(topic, session_id, user_id, n_results=8)
         chunks = result.get("chunks", [])
@@ -262,6 +265,7 @@ Example format:
             context_chunks=[context],
             question=instruction,
             chat_history=[],
+            model_override=model_override,
             persona="academic",
         )
 
@@ -294,6 +298,7 @@ Example format:
         topic = args.get("topic", "the document content")
         num_cards = min(args.get("num_cards", 10), 20)
         card_type = args.get("card_type", "mixed")
+        model_override = args.get("model")
 
         # Search for relevant content
         result = self.rag_service.query(topic, session_id, user_id, n_results=8)
@@ -342,6 +347,7 @@ Example format:
             context_chunks=[context],
             question=instruction,
             chat_history=[],
+            model_override=model_override,
             persona="academic",
         )
         content = self._parse_json_array(raw, "flashcards", session_id)

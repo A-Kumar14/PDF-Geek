@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Tab, Tabs, Dialog, DialogContent, Typography, useMediaQuery, useTheme } from '@mui/material';
-import { Group, Panel, Separator } from 'react-resizable-panels';
 import TopBar from '../components/TopBar';
 import ChatPanel from '../components/ChatPanel';
 import FileViewer from '../components/FileViewer';
@@ -8,17 +7,14 @@ import DropZone from '../components/DropZone';
 import CommandPalette from '../components/CommandPalette';
 import SettingsContent from './SettingsContent';
 import ArtifactPanel from '../components/ArtifactPanel';
-import ResearchNotesPanel from '../components/ResearchNotesPanel';
+import GlobalCommandBar from '../components/GlobalCommandBar';
 import { useFile } from '../contexts/FileContext';
 import { useChatContext } from '../contexts/ChatContext';
-import { useHighlights } from '../contexts/HighlightsContext';
 
-const BORDER_COLOR = '#333333';
 
 export default function MainLayout() {
   const { file, files, fileType, activeFileIndex, setActiveFileIndex, removeFile, targetPage, reportPageChange } = useFile();
   const { clearMessages, artifacts } = useChatContext();
-  const { pinnedNotes, notesPanelOpen } = useHighlights();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -46,23 +42,20 @@ export default function MainLayout() {
   };
 
   const hasArtifacts = artifacts && artifacts.length > 0;
-  const showNotesPanel = notesPanelOpen;
-  const showArtifacts = hasArtifacts && !showNotesPanel;
+  const showArtifacts = hasArtifacts;
 
 
-
-  const borderStyle = `1px solid ${BORDER_COLOR}`;
 
   return (
     <Box sx={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh',
-      background: personaBg,
-      color: '#E5E5E5',
+      height: '100dvh',
+      background: 'var(--bg-primary)',
+      color: 'var(--fg-primary)',
       overflow: 'hidden',
     }}>
-      <Box sx={{ borderBottom: borderStyle }}>
+      <Box sx={{ borderBottom: '1px solid var(--border)' }}>
         <TopBar onOpenSettings={() => setSettingsOpen(true)} />
       </Box>
 
@@ -74,22 +67,21 @@ export default function MainLayout() {
           centered
           sx={{
             minHeight: 36,
-            borderBottom: borderStyle,
+            borderBottom: '1px solid var(--border)',
             '& .MuiTab-root': {
               minHeight: 36,
               py: 0.5,
               fontSize: '0.85rem',
-              fontFamily: 'monospace',
+              fontFamily: 'var(--font-mono)',
               textTransform: 'uppercase',
-              color: '#888',
-              '&.Mui-selected': { color: '#E5E5E5' }
+              color: 'var(--fg-secondary)',
+              '&.Mui-selected': { color: 'var(--fg-primary)' }
             },
-            '& .MuiTabs-indicator': { backgroundColor: '#00FF00' }
+            '& .MuiTabs-indicator': { backgroundColor: 'var(--accent)' }
           }}
         >
           <Tab label="[ DOCUMENT ]" />
           <Tab label="[ CHAT ]" />
-          {pinnedNotes.length > 0 && <Tab label="[ NOTES ]" />}
         </Tabs>
       )}
 
@@ -115,7 +107,7 @@ export default function MainLayout() {
                 position: 'relative',
                 flex: 1,
                 minHeight: 0,
-                bgcolor: '#0D0D0D',
+                bgcolor: 'var(--bg-primary)',
               }}
             >
               {file ? (
@@ -128,8 +120,8 @@ export default function MainLayout() {
                       pt: 1,
                       pb: 0,
                       flexWrap: 'wrap',
-                      borderBottom: borderStyle,
-                      bgcolor: '#000000',
+                      borderBottom: '1px solid var(--border)',
+                      bgcolor: 'var(--bg-secondary)',
                     }}>
                       {files.map((f, idx) => {
                         const name = f.fileName || f.name || 'File';
@@ -138,22 +130,22 @@ export default function MainLayout() {
                             key={idx}
                             onClick={() => setActiveFileIndex(idx)}
                             sx={{
-                              border: `1px solid ${idx === activeFileIndex ? '#E5E5E5' : '#333333'}`,
+                              border: `1px solid ${idx === activeFileIndex ? 'var(--fg-primary)' : 'var(--border)'}`,
                               borderBottom: 'none',
                               px: 1.5,
                               py: 0.5,
                               cursor: 'pointer',
-                              color: idx === activeFileIndex ? '#E5E5E5' : '#888888',
-                              '&:hover': { color: '#FFFFFF', borderColor: '#888888' },
+                              color: idx === activeFileIndex ? 'var(--fg-primary)' : 'var(--fg-secondary)',
+                              '&:hover': { color: 'var(--fg-primary)', borderColor: 'var(--fg-secondary)' },
                               fontSize: '0.75rem',
-                              fontFamily: 'monospace',
+                              fontFamily: 'var(--font-mono)',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 1
                             }}
                           >
                             {name}
-                            <Box component="span" onClick={(e) => { e.stopPropagation(); removeFile(idx); }} sx={{ cursor: 'pointer', '&:hover': { color: 'red' } }}>[x]</Box>
+                            <Box component="span" onClick={(e) => { e.stopPropagation(); removeFile(idx); }} sx={{ cursor: 'pointer', '&:hover': { color: 'var(--error)' } }}>[x]</Box>
                           </Box>
                         );
                       })}
@@ -167,15 +159,15 @@ export default function MainLayout() {
                       right: 12,
                       zIndex: 6,
                       cursor: 'pointer',
-                      border: '1px solid #333',
-                      bgcolor: '#000',
+                      border: '1px solid var(--border)',
+                      bgcolor: 'var(--bg-secondary)',
                       px: 1,
                       py: 0.25,
-                      fontFamily: 'monospace',
+                      fontFamily: 'var(--font-mono)',
                       fontSize: '0.7rem',
                       fontWeight: 700,
-                      color: '#888',
-                      '&:hover': { borderColor: '#FF0000', color: '#FF0000' },
+                      color: 'var(--fg-secondary)',
+                      '&:hover': { borderColor: 'var(--error)', color: 'var(--error)' },
                     }}
                   >
                     [x CLOSE]
@@ -197,207 +189,167 @@ export default function MainLayout() {
                 flexDirection: 'column',
                 flex: 1,
                 minHeight: 0,
-                bgcolor: '#000000',
+                bgcolor: 'var(--bg-primary)',
               }}
             >
               <ChatPanel />
             </Box>
           </>
         ) : (
-          // Desktop: Use resizable panels without sidebar
-          <Group direction="horizontal" style={{ width: '100%', height: '100%', position: 'relative' }}>
-            {/* Document Viewer Panel */}
-            <Panel defaultSize={65} minSize={40} order={1} style={{ position: 'relative', zIndex: 1 }}>
-              <Box
-                role="region"
-                aria-label="Document viewer"
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  height: '100%',
-                  width: '100%',
-                  overflow: 'hidden',
-                  bgcolor: '#0D0D0D',
-                  zIndex: 1,
-                }}
-              >
-                {file ? (
-                  <>
-                    {files.length > 1 && (
-                      <Box sx={{
-                        display: 'flex',
-                        gap: 0.5,
-                        px: 1,
-                        pt: 1,
-                        pb: 0,
-                        flexWrap: 'wrap',
-                        borderBottom: borderStyle,
-                        bgcolor: '#000000',
-                      }}>
-                        {files.map((f, idx) => {
-                          const name = f.fileName || f.name || 'File';
-                          return (
-                            <Box
-                              key={idx}
-                              onClick={() => setActiveFileIndex(idx)}
-                              sx={{
-                                border: `1px solid ${idx === activeFileIndex ? '#E5E5E5' : '#333333'}`,
-                                borderBottom: 'none',
-                                px: 1.5,
-                                py: 0.5,
-                                cursor: 'pointer',
-                                color: idx === activeFileIndex ? '#E5E5E5' : '#888888',
-                                '&:hover': { color: '#FFFFFF', borderColor: '#888888' },
-                                fontSize: '0.75rem',
-                                fontFamily: 'monospace',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1
-                              }}
-                            >
-                              {name}
-                              <Box component="span" onClick={(e) => { e.stopPropagation(); removeFile(idx); }} sx={{ cursor: 'pointer', '&:hover': { color: 'red' } }}>[x]</Box>
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    )}
-                    <Box
-                      onClick={handleRemoveFile}
-                      sx={{
-                        position: 'absolute',
-                        top: files.length > 1 ? 48 : 12,
-                        right: 12,
-                        zIndex: 6,
-                        cursor: 'pointer',
-                        border: '1px solid #333',
-                        bgcolor: '#000',
-                        px: 1,
-                        py: 0.25,
-                        fontFamily: 'monospace',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        color: '#888',
-                        '&:hover': { borderColor: '#FF0000', color: '#FF0000' },
-                      }}
-                    >
-                      [x CLOSE]
-                    </Box>
-                    <FileViewer file={file} fileType={fileType} targetPage={targetPage} onPageChange={reportPageChange} />
-                  </>
-                ) : (
-                  <DropZone />
-                )}
+          // Desktop: CSS Grid Bento Layout
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '240px 1fr 400px',
+              width: '100%',
+              height: '100%',
+              bgcolor: 'var(--bg-primary)',
+              gap: '1px', // Creates border effect via background bleed
+              bgcolor: 'var(--border)',
+            }}
+          >
+            {/* Left Column: File Inventory & Persona Settings (Placeholder for now) */}
+            <Box sx={{ bgcolor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column' }}>
+              <Box sx={{ p: 2, borderBottom: '1px solid var(--border)' }}>
+                <Typography sx={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--fg-dim)' }}>
+                   // INVENTORY
+                </Typography>
               </Box>
-            </Panel>
+              {/* Note: In a future step, DropZone/File List logic can be moved here entirely */}
+              <Box sx={{ p: 2, flex: 1, overflowY: 'auto' }}>
+                <Typography sx={{ color: 'var(--fg-secondary)', fontSize: '0.8rem' }}>Left sidebar content...</Typography>
+              </Box>
+            </Box>
 
-            {/* Resize Handle */}
-            <Separator
-              style={{
-                width: '4px',
-                background: BORDER_COLOR,
-                cursor: 'col-resize',
+            {/* Center Column: Document Viewer or Discovery Dashboard */}
+            <Box
+              role="region"
+              aria-label="Document viewer"
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
                 position: 'relative',
-                flexShrink: 0,
+                height: '100%',
+                overflow: 'hidden',
+                bgcolor: 'var(--bg-primary)',
               }}
             >
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: '20px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: '#000000',
-                  border: `1px solid ${BORDER_COLOR}`,
-                  borderRadius: '4px',
-                  fontSize: '0.6rem',
-                  color: '#888',
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  pointerEvents: 'none',
-                  '&:hover': {
-                    bgcolor: '#1A1A1A',
-                    borderColor: '#00FF00',
-                    color: '#00FF00',
-                  },
-                }}
-              >
-                ⋮
-              </Box>
-            </Separator>
+              {file ? (
+                <>
+                  {files.length > 1 && (
+                    <Box sx={{
+                      display: 'flex',
+                      gap: 0.5,
+                      px: 1,
+                      pt: 1,
+                      pb: 0,
+                      flexWrap: 'wrap',
+                      borderBottom: '1px solid var(--border)',
+                      bgcolor: 'var(--bg-secondary)',
+                    }}>
+                      {files.map((f, idx) => {
+                        const name = f.fileName || f.name || 'File';
+                        return (
+                          <Box
+                            key={idx}
+                            onClick={() => setActiveFileIndex(idx)}
+                            sx={{
+                              border: `1px solid ${idx === activeFileIndex ? 'var(--fg-primary)' : 'var(--border)'}`,
+                              borderBottom: 'none',
+                              px: 1.5,
+                              py: 0.5,
+                              cursor: 'pointer',
+                              color: idx === activeFileIndex ? 'var(--fg-primary)' : 'var(--fg-secondary)',
+                              '&:hover': { color: 'var(--fg-primary)', borderColor: 'var(--fg-secondary)' },
+                              fontSize: '0.75rem',
+                              fontFamily: 'var(--font-mono)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                            {name}
+                            <Box component="span" onClick={(e) => { e.stopPropagation(); removeFile(idx); }} sx={{ cursor: 'pointer', '&:hover': { color: 'var(--error)' } }}>[x]</Box>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                  <Box
+                    onClick={handleRemoveFile}
+                    sx={{
+                      position: 'absolute',
+                      top: files.length > 1 ? 48 : 12,
+                      right: 12,
+                      zIndex: 6,
+                      cursor: 'pointer',
+                      border: '1px solid var(--border)',
+                      bgcolor: 'var(--bg-secondary)',
+                      px: 1,
+                      py: 0.25,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      color: 'var(--fg-secondary)',
+                      '&:hover': { borderColor: 'var(--error)', color: 'var(--error)' },
+                    }}
+                  >
+                    [x CLOSE]
+                  </Box>
+                  <FileViewer file={file} fileType={fileType} targetPage={targetPage} onPageChange={reportPageChange} />
+                </>
+              ) : (
+                <DropZone />
+              )}
+            </Box>
 
-            {/* Chat Panel */}
-            <Panel defaultSize={35} minSize={25} order={2} style={{ position: 'relative', zIndex: 1 }}>
+            {/* Right Column: Agentic Activity Stream (Chat + Artifacts) */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                bgcolor: 'var(--bg-primary)',
+              }}
+            >
+              {/* Main Chat / Reasoning Log */}
               <Box
                 id="main-content"
                 role="main"
-                aria-label="Chat"
+                aria-label="Agentic Reasoning Log"
                 sx={{
+                  flex: showArtifacts ? '0 0 60%' : 1, // Take up 60% of right rail if artifacts exist
                   display: 'flex',
                   flexDirection: 'column',
-                  height: '100%',
-                  width: '100%',
                   overflow: 'hidden',
-                  bgcolor: '#000000',
-                  zIndex: 1,
+                  borderBottom: showArtifacts ? '1px solid var(--border)' : 'none',
                 }}
               >
                 <ChatPanel />
               </Box>
-            </Panel>
 
-            {/* Artifacts/Notes Panel */}
-            {(showNotesPanel || showArtifacts) && (
-              <>
-                <Separator style={{ width: '1px', background: BORDER_COLOR, flexShrink: 0 }} />
-                <Panel defaultSize={20} minSize={15} maxSize={30} order={3}>
-                  <Box
-                    role="complementary"
-                    aria-label="Side panel"
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      height: '100%',
-                      width: '100%',
-                      overflow: 'hidden',
-                      bgcolor: '#000000',
-                    }}
-                  >
-                    {showNotesPanel ? <ResearchNotesPanel /> : <ArtifactPanel />}
-                  </Box>
-                </Panel>
-              </>
-            )}
-          </Group>
+              {/* Artifacts Panel (Bottom half of Right Column) */}
+              {showArtifacts && (
+                <Box
+                  role="complementary"
+                  aria-label="Artifacts panel"
+                  sx={{
+                    flex: '1',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <ArtifactPanel />
+                </Box>
+              )}
+            </Box>
+          </Box>
         )}
       </Box>
 
-      {/* Mobile: Research Notes tab */}
-      {isMobile && pinnedNotes.length > 0 && (
-        <Box
-          role="complementary"
-          aria-label="Research notes"
-          sx={{
-            display: mobileTab === 2 ? 'flex' : 'none',
-            flexDirection: 'column',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 10,
-            bgcolor: '#000000',
-          }}
-        >
-          <ResearchNotesPanel />
-        </Box>
-      )}
+      {/* Global warp-style command input */}
+      <GlobalCommandBar />
 
       {/* Command Palette (CMD+K) */}
       <CommandPalette />
@@ -430,7 +382,7 @@ export default function MainLayout() {
         PaperProps={{ sx: { bgcolor: '#0D0D0D', color: '#E5E5E5', border: '1px solid #333', borderRadius: 0 } }}
       >
         <DialogContent sx={{ p: 2.5 }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 2, textTransform: 'uppercase' }}>// Keyboard Shortcuts</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 2, textTransform: 'uppercase' }}>{'// Keyboard Shortcuts'}</Typography>
           {[
             ['cmd+K', 'Open Command Palette'],
             ['?', 'Toggle this cheat-sheet'],

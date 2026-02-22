@@ -10,27 +10,19 @@ import SuggestionChips from './SuggestionChips';
 import SuggestedPrompts from './SuggestedPrompts';
 import FlashcardPopupDialog from './FlashcardPopupDialog';
 import QuizFlashcardDialog from './QuizFlashcardDialog';
+import ThinkingBlock from './ThinkingBlock';
 
-const CHAT_MODELS = [
-  { id: 'gemini-2.0-flash', label: 'GEMINI 2.0', badge: 'FREE' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o MINI', badge: 'FREE' },
-  { id: 'gemini-2.5-pro', label: 'GEMINI 2.5 PRO', badge: 'PRO' },
-  { id: 'gpt-4o', label: 'GPT-4o', badge: 'PRO' },
-];
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'));
 
 export default function ChatPanel() {
   const scrollRef = useRef(null);
-  const inputRef = useRef(null);
   const { activeSessionId, messages, addMessage, isLoading, streamingContent, stopGeneration, startNewSession, chatSessions } = useChatContext();
   const { file, goToSourcePage } = useFile();
-  const { selectedModel, setSelectedModel } = useModelContext();
+  const { selectedModel } = useModelContext();
 
-  const [input, setInput] = useState('');
   const [showPrompts, setShowPrompts] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
-  const [modelMenuAnchor, setModelMenuAnchor] = useState(null);
 
   // ── Flashcard / Quiz quick-generate state ────────────────────────────────
   const [fcDialogData, setFcDialogData] = useState(null);   // {cards, topic}
@@ -40,7 +32,7 @@ export default function ChatPanel() {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
 
-  const API = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+  const API = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
   const handleQuickGenerate = async (type, topic) => {
     setGenerating(true);
@@ -67,7 +59,7 @@ export default function ChatPanel() {
       const res = await fetch(`${API}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ session_id: sessionId, topic: topic || 'the document', num_cards: 8 }),
+        body: JSON.stringify({ session_id: sessionId, topic: topic || 'the document', num_cards: 8, model: selectedModel }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generation failed');
@@ -85,8 +77,6 @@ export default function ChatPanel() {
     }
   };
 
-  const activeModelLabel = CHAT_MODELS.find(m => m.id === selectedModel)?.label || selectedModel.toUpperCase();
-
   const handleCopy = (id, content) => {
     navigator.clipboard.writeText(content).then(() => {
       setCopiedId(id);
@@ -100,27 +90,6 @@ export default function ChatPanel() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, streamingContent, isLoading]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if ((!input.trim() && !file) || isLoading) return;
-
-    const userMsg = input;
-    setInput('');
-    setShowPrompts(false);
-    await addMessage(userMsg);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  const handleVoiceTranscript = (transcript) => {
-    setInput((prev) => prev + (prev ? ' ' : '') + transcript);
-  };
 
   // Combine messages with streaming content for display
   const displayMessages = useMemo(() => {
@@ -175,8 +144,7 @@ export default function ChatPanel() {
             </Box>
             <SuggestedPrompts
               onSelect={(prompt) => {
-                setInput(prompt);
-                // Optional: auto-submit or just fill
+                addMessage(prompt);
               }}
             />
           </Box>
@@ -189,13 +157,19 @@ export default function ChatPanel() {
                 maxWidth: '85%',
               }}
             >
+              {/* Insert ThinkingBlock *outside* the actual message bubble */}
+              {msg.role === 'assistant' && msg.tool_calls?.length > 0 && (
+                <ThinkingBlock steps={msg.tool_calls} isGenerating={msg.isStreaming} />
+              )}
+
               {/* Custom Message Bubble for Brutalist Theme */}
               <Box
                 sx={{
-                  border: msg.role === 'user' ? '1px solid #E5E5E5' : '1px solid #333333',
-                  bgcolor: msg.role === 'user' ? '#000000' : '#0D0D0D',
+                  border: msg.role === 'user' ? '1px solid var(--border)' : '1px solid var(--border)',
+                  bgcolor: msg.role === 'user' ? 'transparent' : 'var(--bg-secondary)',
                   p: 1.5,
                   position: 'relative',
+                  borderRadius: msg.role === 'user' ? '4px 0 4px 4px' : '0 4px 4px 4px',
                 }}
               >
                 <Typography
@@ -287,178 +261,7 @@ export default function ChatPanel() {
         )}
       </Box>
 
-      {/* Input Area */}
-      <Box sx={{ p: 2, borderTop: '1px solid #333333', bgcolor: '#000000' }}>
-        <SuggestionChips onSelect={(chip) => setInput(chip)} />
-
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            border: '1px solid #333333',
-            p: 0.5, // Reduced padding tightens the look
-            '&:focus-within': {
-              border: '1px solid #E5E5E5'
-            }
-          }}
-        >
-          <Box sx={{ pl: 1, color: '#00FF00', fontFamily: 'monospace', fontWeight: 700, fontSize: '1.2rem' }}>
-            {'>'}
-          </Box>
-          <TextField
-            inputRef={inputRef}
-            fullWidth
-            multiline
-            maxRows={4}
-            placeholder="ENTER_COMMAND..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            variant="standard"
-            InputProps={{
-              disableUnderline: true,
-              sx: {
-                fontFamily: 'monospace',
-                color: '#E5E5E5',
-                fontSize: '0.9rem',
-                '& ::placeholder': { color: '#666', opacity: 1 }
-              }
-            }}
-          />
-
-          {/* Inline Model Selector pill */}
-          <Box
-            onClick={(e) => setModelMenuAnchor(e.currentTarget)}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5,
-              border: '1px solid #333',
-              px: 1,
-              py: 0.25,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              '&:hover': { borderColor: '#E5E5E5' },
-            }}
-          >
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#00FF00', fontWeight: 700 }}>
-              {activeModelLabel}
-            </Typography>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#555' }}>▾</Typography>
-          </Box>
-
-          <Menu
-            anchorEl={modelMenuAnchor}
-            open={Boolean(modelMenuAnchor)}
-            onClose={() => setModelMenuAnchor(null)}
-            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            PaperProps={{
-              sx: {
-                bgcolor: '#0D0D0D',
-                border: '1px solid #333',
-                borderRadius: 0,
-                mt: -0.5,
-              },
-            }}
-          >
-            <Box sx={{ px: 1.5, pt: 1, pb: 0.5 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                SELECT MODEL
-              </Typography>
-            </Box>
-            {CHAT_MODELS.map((m) => (
-              <MenuItem
-                key={m.id}
-                selected={m.id === selectedModel}
-                onClick={() => { setSelectedModel(m.id); setModelMenuAnchor(null); }}
-                sx={{
-                  py: 0.5,
-                  px: 1.5,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 1.5,
-                  '&.Mui-selected': { bgcolor: 'rgba(0,255,0,0.08)', borderLeft: '2px solid #00FF00' },
-                  '&:hover': { bgcolor: '#1A1A1A' },
-                }}
-              >
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#E5E5E5', fontWeight: m.id === selectedModel ? 700 : 400 }}>
-                  {m.label}
-                </Typography>
-                <Typography sx={{
-                  fontFamily: 'monospace',
-                  fontSize: '0.6rem',
-                  color: m.badge === 'FREE' ? '#00FF00' : '#FF00FF',
-                  border: `1px solid ${m.badge === 'FREE' ? '#00FF00' : '#FF00FF'}`,
-                  px: 0.5,
-                }}>
-                  {m.badge}
-                </Typography>
-              </MenuItem>
-            ))}
-          </Menu>
-
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {!isLoading ? (
-              <IconButton
-                type="submit"
-                disabled={!input.trim()}
-                sx={{
-                  color: '#E5E5E5',
-                  borderRadius: 0,
-                  '&:hover': { bgcolor: '#333333' },
-                  '&.Mui-disabled': { color: '#444' }
-                }}
-              >
-                <SendIcon fontSize="small" />
-              </IconButton>
-            ) : (
-              <IconButton
-                onClick={stopGeneration}
-                sx={{
-                  color: '#FF0000',
-                  borderRadius: 0,
-                  '&:hover': { bgcolor: '#330000' }
-                }}
-              >
-                <StopIcon fontSize="small" />
-              </IconButton>
-            )}
-          </Box>
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, gap: 1 }}>
-          {/* Quick-action buttons */}
-          <Box sx={{ display: 'flex', gap: 0.75 }}>
-            <Box
-              onClick={() => { setTopicPrompt('flashcards'); setTopicInput(''); setGenError(''); }}
-              sx={{
-                fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
-                color: '#888', border: '1px solid #2A2A2A', px: 1.25, py: 0.4,
-                cursor: 'pointer', userSelect: 'none',
-                '&:hover': { color: '#FFAA00', borderColor: '#FFAA00' },
-              }}
-            >
-              [⚡ FLASHCARDS]
-            </Box>
-            <Box
-              onClick={() => { setTopicPrompt('quiz'); setTopicInput(''); setGenError(''); }}
-              sx={{
-                fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
-                color: '#888', border: '1px solid #2A2A2A', px: 1.25, py: 0.4,
-                cursor: 'pointer', userSelect: 'none',
-                '&:hover': { color: '#00FF00', borderColor: '#00FF00' },
-              }}
-            >
-              [📝 QUIZ]
-            </Box>
-          </Box>
-          <VoiceInput onTranscript={handleVoiceTranscript} />
-        </Box>
-      </Box>
+      {/* Input handled by GlobalCommandBar */}
 
       {/* Topic prompt mini-dialog */}
       <Dialog
@@ -470,7 +273,7 @@ export default function ChatPanel() {
       >
         <DialogContent sx={{ p: 2 }}>
           <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
-            // Generate {topicPrompt} from this session
+            {`// Generate ${topicPrompt} from this session`}
           </Typography>
           <TextField
             autoFocus

@@ -11,10 +11,13 @@ import {
 } from '@mui/material';
 import { useChatContext } from '../contexts/ChatContext';
 import { usePersona } from '../contexts/PersonaContext';
+import { useThemeMode } from '../theme/ThemeContext';
+import { THEME_NAMES, FONT_NAMES } from '../theme/themes';
 
 export default function SettingsContent() {
   const { clearAllSessions } = useChatContext();
   const { personaId, selectPersona, personas } = usePersona();
+  const { themeName, setTheme, font, setFont } = useThemeMode();
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('filegeek-gemini-key') || '');
   const [openaiKey, setOpenaiKey] = useState(() => localStorage.getItem('filegeek-api-key') || '');
   const [notionToken, setNotionToken] = useState(() => localStorage.getItem('filegeek-notion-token') || '');
@@ -92,6 +95,50 @@ export default function SettingsContent() {
           ))}
         </Select>
       </FormControl>
+
+      <Divider sx={{ borderColor: '#333333', my: 3 }} />
+
+      {/* Appearance */}
+      <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: '#E5E5E5', mb: 0.5 }}>
+        {`// APPEARANCE`}
+      </Typography>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
+        Customize the visual theme and typography of FileGeek.
+      </Typography>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <FormControl fullWidth size="small">
+          <InputLabel sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>THEME_PRESET</InputLabel>
+          <Select
+            value={themeName}
+            onChange={(e) => setTheme(e.target.value)}
+            label="THEME_PRESET"
+            sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+          >
+            {THEME_NAMES.map((t) => (
+              <MenuItem key={t} value={t} sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                {t.toUpperCase()}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth size="small">
+          <InputLabel sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>TYPOGRAPHY</InputLabel>
+          <Select
+            value={font}
+            onChange={(e) => setFont(e.target.value)}
+            label="TYPOGRAPHY"
+            sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
+          >
+            {FONT_NAMES.map((f) => (
+              <MenuItem key={f} value={f} sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                {f.toUpperCase()}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       <Divider sx={{ borderColor: '#333333', my: 3 }} />
 

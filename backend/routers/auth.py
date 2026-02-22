@@ -1,4 +1,4 @@
-"""FastAPI auth routes: signup and login."""
+"""FastAPI auth routes: signup, login, and JWT refresh."""
 
 import asyncio
 import os
@@ -7,7 +7,7 @@ from functools import partial
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -18,10 +18,39 @@ from schemas import SignupRequest, LoginRequest
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY", "change-me-in-production"))
+# Access token: 15 minutes (short-lived, stored in memory by frontend)
+ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "15"))
+# Refresh token: 30 days (long-lived, stored in httpOnly cookie)
+REFRESH_TOKEN_DAYS = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
+# Legacy fallback for clients that haven't migrated yet
 JWT_EXPIRY_HOURS = 24
+
+_REFRESH_COOKIE = "filegeek_refresh"
+
+
+def _create_access_token(user: User) -> str:
+    payload = {
+        "user_id": user.id,
+        "email": user.email,
+        "type": "access",
+        "iat": datetime.utcnow(),
+        "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_MINUTES),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+def _create_refresh_token(user: User) -> str:
+    payload = {
+        "user_id": user.id,
+        "type": "refresh",
+        "iat": datetime.utcnow(),
+        "exp": datetime.utcnow() + timedelta(days=REFRESH_TOKEN_DAYS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
 def _create_token(user: User) -> str:
+    """Legacy 24-hour token — kept for backward compatibility with app.py clients."""
     payload = {
         "user_id": user.id,
         "email": user.email,
@@ -31,8 +60,20 @@ def _create_token(user: User) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=_REFRESH_COOKIE,
+        value=token,
+        httponly=True,
+        secure=os.getenv("HTTPS_ONLY", "false").lower() == "true",
+        samesite="strict",
+        max_age=REFRESH_TOKEN_DAYS * 86400,
+        path="/auth/refresh",
+    )
+
+
 @router.post("/signup", status_code=201)
-async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
+async def signup(data: SignupRequest, response: Response, db: AsyncSession = Depends(get_db)):
     name = data.name.strip()
     email = data.email.strip().lower()
     password = data.password
@@ -42,7 +83,6 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered")
 
     loop = asyncio.get_event_loop()
-    # rounds=10 is still well above OWASP minimums and ~4x faster on serverless cold starts
     salt = await loop.run_in_executor(None, partial(bcrypt.gensalt, rounds=10))
     password_hash = await loop.run_in_executor(
         None, partial(bcrypt.hashpw, password.encode("utf-8"), salt)
@@ -52,12 +92,21 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(user)
 
-    token = _create_token(user)
-    return {"token": token, "user": {"id": user.id, "name": user.name, "email": user.email}}
+    access_token = _create_access_token(user)
+    refresh_token = _create_refresh_token(user)
+    _set_refresh_cookie(response, refresh_token)
+
+    # Also include legacy 24h token for backward compatibility
+    legacy_token = _create_token(user)
+    return {
+        "token": legacy_token,           # legacy — long-lived for older clients
+        "access_token": access_token,    # new — short-lived, store in memory
+        "user": {"id": user.id, "name": user.name, "email": user.email},
+    }
 
 
 @router.post("/login")
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(data: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     email = data.email.strip().lower()
     password = data.password
 
@@ -65,6 +114,7 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
     loop = asyncio.get_event_loop()
     pw_matches = await loop.run_in_executor(
         None, partial(bcrypt.checkpw, password.encode("utf-8"), user.password_hash.encode("utf-8"))
@@ -72,5 +122,53 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not pw_matches:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = _create_token(user)
-    return {"token": token, "user": {"id": user.id, "name": user.name, "email": user.email}}
+    access_token = _create_access_token(user)
+    refresh_token = _create_refresh_token(user)
+    _set_refresh_cookie(response, refresh_token)
+
+    legacy_token = _create_token(user)
+    return {
+        "token": legacy_token,
+        "access_token": access_token,
+        "user": {"id": user.id, "name": user.name, "email": user.email},
+    }
+
+
+@router.post("/refresh")
+async def refresh_token(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    filegeek_refresh: str = Cookie(default=None),
+):
+    """Exchange a valid refresh token (httpOnly cookie) for a new access token."""
+    if not filegeek_refresh:
+        raise HTTPException(status_code=401, detail="No refresh token")
+
+    try:
+        payload = jwt.decode(filegeek_refresh, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired — please log in again")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Token type mismatch")
+
+    result = await db.execute(select(User).where(User.id == payload["user_id"]))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Issue a new access token (rotate refresh token for forward secrecy)
+    new_access = _create_access_token(user)
+    new_refresh = _create_refresh_token(user)
+    _set_refresh_cookie(response, new_refresh)
+
+    return {"access_token": new_access, "user": {"id": user.id, "name": user.name, "email": user.email}}
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Clear the refresh token cookie."""
+    response.delete_cookie(key=_REFRESH_COOKIE, path="/auth/refresh")
+    return {"message": "Logged out"}

@@ -10,22 +10,28 @@ module.exports = function (app) {
     })
   );
 
-  // Proxy Flask backend routes
-  const flaskProxy = createProxyMiddleware({
-    target: "http://localhost:5000",
+  // Proxy all backend routes to FastAPI (main.py) on port 8000
+  // Port 5001 was Flask (app.py); 8000 is the FastAPI production server.
+  const fastapiProxy = createProxyMiddleware({
+    target: "http://localhost:8000",
     changeOrigin: true,
   });
 
-  app.use("/upload", flaskProxy);
-  app.use("/ask", flaskProxy);
-  app.use("/health", flaskProxy);
-  app.use("/tts", flaskProxy);
-  app.use("/export", flaskProxy);
-  app.use("/auth", flaskProxy);
-  app.use("/personas", flaskProxy);
-  app.use("/sessions", flaskProxy);
-  app.use("/messages", flaskProxy);
-  app.use("/transcribe", flaskProxy);
-  app.use("/tasks", flaskProxy);
-  app.use("/s3", flaskProxy);
+  app.use("/upload", fastapiProxy);
+  app.use("/ask", fastapiProxy);
+  app.use("/health", fastapiProxy);
+  app.use("/tts", fastapiProxy);
+  app.use("/export", fastapiProxy);
+  app.use("/auth", fastapiProxy);
+  app.use("/personas", fastapiProxy);
+  app.use("/sessions", fastapiProxy);
+  app.use("/messages", fastapiProxy);
+  app.use("/transcribe", fastapiProxy);
+  app.use("/tasks", fastapiProxy);
+  app.use("/s3", fastapiProxy);
+  app.use("/flashcards", fastapiProxy);
+  app.use("/quiz", fastapiProxy);
+  app.use("/analytics", fastapiProxy);
+  app.use("/workers", fastapiProxy);
 };
+

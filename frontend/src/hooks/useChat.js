@@ -7,7 +7,7 @@ export default function useChat() {
    * - If files have uploadedUrl (UploadThing CDN) → JSON POST to /ask
    * - Otherwise fall back to FormData POST to /upload (old flow)
    */
-  const sendMessage = useCallback(async (question, fileEntries, chatHistory, deepThink, persona) => {
+  const sendMessage = useCallback(async (question, fileEntries, chatHistory, deepThink, persona, model) => {
     const entries = Array.isArray(fileEntries) ? fileEntries : [fileEntries];
     const uploaded = entries.filter((e) => e.uploadedUrl);
 
@@ -19,13 +19,16 @@ export default function useChat() {
         type: e.fileType,
       }));
 
-      const res = await apiClient.post('/ask', {
+      const payload = {
         fileUrls,
         question: question.trim(),
         chatHistory,
         deepThink: !!deepThink,
         persona: persona || 'academic',
-      });
+      };
+      if (model) payload.model = model;
+
+      const res = await apiClient.post('/ask', payload);
 
       return {
         answer: res.data.answer || 'No response received.',
@@ -44,6 +47,7 @@ export default function useChat() {
     formData.append('chatHistory', JSON.stringify(chatHistory));
     if (deepThink) formData.append('deepThink', 'true');
     formData.append('persona', persona || 'academic');
+    if (model) formData.append('model', model);
 
     const res = await apiClient.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

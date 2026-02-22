@@ -1,43 +1,68 @@
+/* ── Font imports ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+/* OpenDyslexic is served from a CDN that doesn't require OAuth — loaded below */
+@import url('https://fonts.cdnfonts.com/css/opendyslexic');
+
+/* ── CSS Custom Property Defaults (dark theme baseline) ────────────────────── */
+/* ThemeContext.js overrides these at runtime by setting inline styles on :root */
+:root {
+  --bg-primary:   #0D0D0D;
+  --bg-secondary: #111111;
+  --bg-tertiary:  #1A1A1A;
+  --bg-hover:     #222222;
+  --fg-primary:   #E5E5E5;
+  --fg-secondary: #AAAAAA;
+  --fg-dim:       #666666;
+  --accent:       #00FF00;
+  --accent-dim:   rgba(0,255,0,0.15);
+  --accent-glow:  0 0 12px rgba(0,255,0,0.4);
+  --border:       #333333;
+  --border-focus: #555555;
+  --error:        #FF4444;
+  --warning:      #FFAA00;
+  --success:      #00FF00;
+  --shadow:       0 4px 24px rgba(0,0,0,0.8);
+
+  /* Typography */
+  --font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --font-mono:   'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+
+  /* Density */
+  --spacing-unit: 4px;
+  --radius:       2px;
+  --line-height:  1.4;
+}
 
 body {
   margin: 0;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #000000;
-  color: #E5E5E5;
+  background-color: var(--bg-primary);
+  color: var(--fg-primary);
+  line-height: var(--line-height);
 }
 
 code {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
-/* Global Reset for MUI components to match the brutalist aesthetic */
+/* Global Reset for MUI components  */
 * {
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 
-/* Remove rounded corners from MUI Paper, Button, etc. globally */
 .MuiPaper-root, .MuiButton-root, .MuiInputBase-root, .MuiCard-root {
   border-radius: 0 !important;
   box-shadow: none !important;
-  background-image: none !important; /* Remove elevation overlay in dark mode */
+  background-image: none !important;
 }
 
 /* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #0D0D0D;
-}
-::-webkit-scrollbar-thumb {
-  background: #333333;
-  border: 1px solid #000000;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #E5E5E5;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border: 1px solid var(--bg-primary); }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-primary); }
+

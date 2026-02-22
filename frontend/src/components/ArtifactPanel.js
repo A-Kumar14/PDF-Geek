@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Tooltip, Button } from '@mui/material';
 import { useChatContext } from '../contexts/ChatContext';
+import { useFile } from '../contexts/FileContext';
 import QuizFlashcardDialog from './QuizFlashcardDialog';
 import FlashcardPopupDialog from './FlashcardPopupDialog';
 import axios from 'axios';
@@ -775,7 +776,7 @@ function FlashcardComponent({ data, messageId, sessionId }) {
   );
 }
 
-function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog }) {
+function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog, goToSourcePage }) {
   const type = artifact.artifact_type || artifact.viz_type || 'unknown';
 
   if (type === 'visualization' && artifact.viz_type === 'mermaid' && artifact.content) {
@@ -811,15 +812,43 @@ function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog }) {
   }
 
   const text = artifact.instruction || artifact.context || JSON.stringify(artifact, null, 2);
+  const sources = artifact.sources || [];
+
   return (
-    <Box sx={{ border: '1px solid #333', p: 1.5, overflow: 'auto', maxHeight: 400 }}>
-      <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', margin: 0, fontFamily: 'monospace', color: '#E5E5E5' }}>{text}</pre>
+    <Box sx={{ border: '1px solid var(--border)', p: 1.5, overflow: 'auto', maxHeight: 400 }}>
+      {/* Source chips — clickable, navigate + highlight PDF */}
+      {sources.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+          {sources.map((src, i) => (
+            <Box
+              key={i}
+              onClick={() => goToSourcePage(src)}
+              sx={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.65rem',
+                color: 'var(--accent)',
+                border: '1px solid var(--accent)',
+                px: 0.75,
+                py: 0.25,
+                cursor: 'pointer',
+                userSelect: 'none',
+                opacity: 0.8,
+                '&:hover': { bgcolor: 'var(--accent-dim)', opacity: 1 },
+              }}
+            >
+              [SRC:{src.pages?.[0] || '?'}]
+            </Box>
+          ))}
+        </Box>
+      )}
+      <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', margin: 0, fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{text}</pre>
     </Box>
   );
 }
 
 export default function ArtifactPanel() {
   const { artifacts, clearArtifacts, activeSessionId } = useChatContext();
+  const { goToSourcePage } = useFile();
   const [quizDialogData, setQuizDialogData] = useState(null);
   const [flashcardDialogData, setFlashcardDialogData] = useState(null);
   const prevArtifactCountRef = useRef(0);
@@ -882,6 +911,7 @@ export default function ArtifactPanel() {
               artifact={artifact}
               sessionId={activeSessionId}
               onOpenQuizDialog={setQuizDialogData}
+              goToSourcePage={goToSourcePage}
             />
           </Box>
         ))}
