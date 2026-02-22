@@ -23,7 +23,7 @@ const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'));
 export default function ChatPanel() {
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
-  const { activeSessionId, messages, addMessage, isLoading, streamingContent, stopGeneration } = useChatContext();
+  const { activeSessionId, messages, addMessage, isLoading, streamingContent, stopGeneration, startNewSession, chatSessions } = useChatContext();
   const { file, goToSourcePage } = useFile();
   const { selectedModel, setSelectedModel } = useModelContext();
 
@@ -47,11 +47,27 @@ export default function ChatPanel() {
     setGenError('');
     const token = localStorage.getItem('filegeek-token');
     try {
+      // Resolve session — use active session, fall back to most recent, or create one.
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        // Try the most recently updated session in list
+        if (chatSessions && chatSessions.length > 0) {
+          sessionId = chatSessions[0].id;
+        } else {
+          // Create a fresh session
+          const docName = file?.name || 'Document';
+          sessionId = await startNewSession(docName, 'pdf');
+        }
+      }
+      if (!sessionId) {
+        throw new Error('No active session. Open a document and start a chat first.');
+      }
+
       const endpoint = type === 'flashcards' ? '/flashcards/generate' : '/quiz/generate';
       const res = await fetch(`${API}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ session_id: activeSessionId, topic: topic || 'the document', num_cards: 8 }),
+        body: JSON.stringify({ session_id: sessionId, topic: topic || 'the document', num_cards: 8 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generation failed');
