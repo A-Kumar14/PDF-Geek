@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Tooltip, Button } from '@mui/material';
 import { useChatContext } from '../contexts/ChatContext';
 import QuizFlashcardDialog from './QuizFlashcardDialog';
+import FlashcardPopupDialog from './FlashcardPopupDialog';
 import axios from 'axios';
 
 function MermaidDiagram({ code }) {
@@ -820,8 +821,34 @@ function ArtifactRenderer({ artifact, sessionId, onOpenQuizDialog }) {
 export default function ArtifactPanel() {
   const { artifacts, clearArtifacts, activeSessionId } = useChatContext();
   const [quizDialogData, setQuizDialogData] = useState(null);
+  const [flashcardDialogData, setFlashcardDialogData] = useState(null);
+  const prevArtifactCountRef = useRef(0);
+
+  // Auto-open flashcard popup whenever a new flashcard artifact arrives
+  useEffect(() => {
+    if (!artifacts || artifacts.length === 0) return;
+    const newCount = artifacts.length;
+    if (newCount > prevArtifactCountRef.current) {
+      const latest = artifacts[artifacts.length - 1];
+      if (latest?.artifact_type === 'flashcards' && latest?.content) {
+        try {
+          const cards = typeof latest.content === 'string' ? JSON.parse(latest.content) : latest.content;
+          if (Array.isArray(cards) && cards.length > 0) {
+            setFlashcardDialogData({
+              cards,
+              topic: latest.topic,
+              messageId: latest.message_id,
+              sessionId: latest.session_id || activeSessionId,
+            });
+          }
+        } catch { /* bad JSON — skip */ }
+      }
+    }
+    prevArtifactCountRef.current = newCount;
+  }, [artifacts, activeSessionId]);
 
   if (!artifacts || artifacts.length === 0) return null;
+
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#000000' }}>
@@ -864,6 +891,15 @@ export default function ArtifactPanel() {
         open={Boolean(quizDialogData)}
         onClose={() => setQuizDialogData(null)}
         questions={quizDialogData || []}
+      />
+
+      <FlashcardPopupDialog
+        open={Boolean(flashcardDialogData)}
+        onClose={() => setFlashcardDialogData(null)}
+        cards={flashcardDialogData?.cards || []}
+        topic={flashcardDialogData?.topic}
+        messageId={flashcardDialogData?.messageId}
+        sessionId={flashcardDialogData?.sessionId}
       />
     </Box>
   );

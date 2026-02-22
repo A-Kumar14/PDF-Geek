@@ -204,13 +204,7 @@ class ToolExecutor:
                 "interactive": True,
             }
 
-        return {
-            "artifact_type": "quiz",
-            "context": context,
-            "topic": topic,
-            "num_questions": num_questions,
-            "interactive": True,
-            "instruction": f"""Generate {num_questions} multiple-choice questions about '{topic}' based on the provided context.
+        instruction = f"""Generate {num_questions} multiple-choice questions about '{topic}' based on the provided context.
 
 IMPORTANT: Return ONLY a valid JSON array with no additional text, markdown formatting, or code blocks.
 
@@ -228,7 +222,22 @@ Example format:
     "correct_index": 1,
     "explanation": "Choice B is correct because..."
   }}
-]""",
+]"""
+
+        # Sub-call: generate quiz content directly via AI, don't rely on outer agentic loop
+        raw = self.ai_service.answer_from_context(
+            context_chunks=[context],
+            question=instruction,
+            chat_history=[],
+            persona="academic",
+        )
+        content = self._parse_json_array(raw, "quiz", session_id)
+
+        return {
+            "artifact_type": "quiz",
+            "content": content,
+            "topic": topic,
+            "interactive": True,
         }
 
     def _create_study_guide(self, args: dict, session_id: str, user_id: int) -> dict:
@@ -248,12 +257,19 @@ Example format:
                 "message": "No document content found to create a study guide from.",
             }
 
+        instruction = f"Create a {depth} study guide about '{topic}'. Include: overview, key concepts, detailed notes, review questions. Use Markdown formatting."
+        content = self.ai_service.answer_from_context(
+            context_chunks=[context],
+            question=instruction,
+            chat_history=[],
+            persona="academic",
+        )
+
         return {
             "artifact_type": "study_guide",
-            "context": context,
+            "content": content,
             "topic": topic,
             "depth": depth,
-            "instruction": f"Create a {depth} study guide about '{topic}'. Include: overview, key concepts, detailed notes, review questions. Use Markdown formatting.",
         }
 
     def _generate_visualization(self, args: dict, session_id: str, user_id: int) -> dict:
@@ -300,13 +316,7 @@ Example format:
             "mixed": "Include a variety of definitions, concepts, and facts.",
         }
 
-        return {
-            "artifact_type": "flashcards",
-            "context": context,
-            "topic": topic,
-            "num_cards": num_cards,
-            "card_type": card_type,
-            "instruction": f"""Generate {num_cards} flashcards about '{topic}' based on the provided context.
+        instruction = f"""Generate {num_cards} flashcards about '{topic}' based on the provided context.
 {card_type_instructions.get(card_type, '')}
 
 IMPORTANT: Return ONLY a valid JSON array with no additional text, markdown formatting, or code blocks.
@@ -325,5 +335,63 @@ Example format:
     "difficulty": "medium",
     "tags": ["concept", "fundamentals"]
   }}
-]""",
+]"""
+
+        # Sub-call: generate flashcard content directly via AI, don't rely on outer agentic loop
+        raw = self.ai_service.answer_from_context(
+            context_chunks=[context],
+            question=instruction,
+            chat_history=[],
+            persona="academic",
+        )
+        content = self._parse_json_array(raw, "flashcards", session_id)
+
+        return {
+            "artifact_type": "flashcards",
+            "content": content,
+            "topic": topic,
+            "card_type": card_type,
         }
+
+    # ── Shared helpers ──────────────────────────────────────────────────────────
+
+    def _parse_json_array(self, raw: Optional[str], artifact_type: str, session_id: str) -> Optional[List]:
+        """Extract and parse the first valid JSON array from a raw AI response string."""
+        if not raw:
+            logger.warning(f"_parse_json_array: empty raw response type={artifact_type} session={session_id}")
+            return None
+
+        # Strip markdown code fences if present
+        cleaned = re.sub(r'```(?:json)?\s*', '', raw).strip().rstrip('```').strip()
+
+        # Try the whole string first (ideal case: AI returned bare JSON)
+        try:
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, list):
+                logger.info(f"_parse_json_array: success type={artifact_type} items={len(parsed)}")
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+        # Walk [ ... ] spans and pick the first valid array
+        for m in re.finditer(r'\[', raw):
+            start = m.start()
+            depth = 0
+            for i, ch in enumerate(raw[start:], start=start):
+                if ch == '[':
+                    depth += 1
+                elif ch == ']':
+                    depth -= 1
+                    if depth == 0:
+                        candidate = raw[start:i + 1]
+                        try:
+                            parsed = json.loads(candidate)
+                            if isinstance(parsed, list) and len(parsed) > 0:
+                                logger.info(f"_parse_json_array: extracted type={artifact_type} items={len(parsed)}")
+                                return parsed
+                        except json.JSONDecodeError:
+                            pass
+                        break
+
+        logger.error(f"_parse_json_array: no valid array found type={artifact_type} raw_len={len(raw)}")
+        return None
