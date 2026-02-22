@@ -643,6 +643,94 @@ def load_flashcard_progress(session_id, message_id):
     }), 200
 
 
+@app.route("/flashcards/generate", methods=["POST"])
+@jwt_required
+@limiter.limit("10/minute")
+def generate_flashcards_direct():
+    """Generate flashcards directly from session documents.
+
+    Bypasses the LLM agentic loop — calls the ToolExecutor's
+    generate_flashcards handler directly for reliable structured output.
+
+    Body: { session_id, topic (optional), num_cards (optional, default 8) }
+    """
+    user_id = _get_user_id()
+    data = request.get_json(silent=True) or {}
+
+    session_id = data.get("session_id")
+    topic = (data.get("topic") or "").strip() or "the document"
+    num_cards = min(int(data.get("num_cards", 8)), 20)
+
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+
+    session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
+    if not session:
+        return jsonify({"error": "Session not found or not authorized"}), 404
+
+    # Call the tool directly — no LLM tool-calling involved
+    result = tool_executor.execute(
+        "generate_flashcards",
+        {"topic": topic, "num_cards": num_cards, "card_type": "mixed"},
+        session_id,
+        user_id,
+    )
+
+    if result.get("error"):
+        return jsonify({"error": result["error"]}), 500
+
+    content = result.get("content")
+    if not content:
+        return jsonify({"error": "No document content found. Upload and index a document first."}), 422
+
+    return jsonify({
+        "cards": content,
+        "topic": result.get("topic", topic),
+        "card_type": result.get("card_type", "mixed"),
+        "total": len(content),
+    }), 200
+
+
+@app.route("/quiz/generate", methods=["POST"])
+@jwt_required
+@limiter.limit("10/minute")
+def generate_quiz_direct():
+    """Generate a quiz directly from session documents (bypasses agentic loop)."""
+    user_id = _get_user_id()
+    data = request.get_json(silent=True) or {}
+
+    session_id = data.get("session_id")
+    topic = (data.get("topic") or "").strip() or "the document"
+    num_questions = min(int(data.get("num_cards", data.get("num_questions", 5))), 10)
+
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+
+    session = StudySession.query.filter_by(id=session_id, user_id=user_id).first()
+    if not session:
+        return jsonify({"error": "Session not found or not authorized"}), 404
+
+    result = tool_executor.execute(
+        "generate_quiz",
+        {"topic": topic, "num_questions": num_questions},
+        session_id,
+        user_id,
+    )
+
+    if result.get("error"):
+        return jsonify({"error": result["error"]}), 500
+
+    content = result.get("content")
+    if not content:
+        return jsonify({"error": "No document content found. Upload and index a document first."}), 422
+
+    return jsonify({
+        "questions": content,
+        "topic": result.get("topic", topic),
+        "total": len(content),
+    }), 200
+
+
 # =========================================================
 # AUDIO TRANSCRIPTION
 # =========================================================

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react';
-import { Box, TextField, IconButton, Typography, LinearProgress, Menu, MenuItem } from '@mui/material';
+import { Box, TextField, IconButton, Typography, LinearProgress, Menu, MenuItem, Dialog, DialogContent } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import StopIcon from '@mui/icons-material/Stop';
 import { useChatContext } from '../contexts/ChatContext';
@@ -8,12 +8,14 @@ import { useModelContext } from '../contexts/ModelContext';
 import VoiceInput from './VoiceInput';
 import SuggestionChips from './SuggestionChips';
 import SuggestedPrompts from './SuggestedPrompts';
+import FlashcardPopupDialog from './FlashcardPopupDialog';
+import QuizFlashcardDialog from './QuizFlashcardDialog';
 
 const CHAT_MODELS = [
   { id: 'gemini-2.0-flash', label: 'GEMINI 2.0', badge: 'FREE' },
-  { id: 'gpt-4o-mini',      label: 'GPT-4o MINI', badge: 'FREE' },
-  { id: 'gemini-2.5-pro',   label: 'GEMINI 2.5 PRO', badge: 'PRO' },
-  { id: 'gpt-4o',           label: 'GPT-4o', badge: 'PRO' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o MINI', badge: 'FREE' },
+  { id: 'gemini-2.5-pro', label: 'GEMINI 2.5 PRO', badge: 'PRO' },
+  { id: 'gpt-4o', label: 'GPT-4o', badge: 'PRO' },
 ];
 
 const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'));
@@ -21,13 +23,7 @@ const MarkdownRenderer = lazy(() => import('./MarkdownRenderer'));
 export default function ChatPanel() {
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
-  const {
-    messages,
-    addMessage,
-    isLoading,
-    streamingContent,
-    stopGeneration,
-  } = useChatContext();
+  const { activeSessionId, messages, addMessage, isLoading, streamingContent, stopGeneration } = useChatContext();
   const { file, goToSourcePage } = useFile();
   const { selectedModel, setSelectedModel } = useModelContext();
 
@@ -36,13 +32,50 @@ export default function ChatPanel() {
   const [copiedId, setCopiedId] = useState(null);
   const [modelMenuAnchor, setModelMenuAnchor] = useState(null);
 
+  // ── Flashcard / Quiz quick-generate state ────────────────────────────────
+  const [fcDialogData, setFcDialogData] = useState(null);   // {cards, topic}
+  const [quizDialogData, setQuizDialogData] = useState(null); // [questions]
+  const [topicPrompt, setTopicPrompt] = useState(null);      // 'flashcards' | 'quiz' | null
+  const [topicInput, setTopicInput] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
+
+  const API = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
+  const handleQuickGenerate = async (type, topic) => {
+    setGenerating(true);
+    setGenError('');
+    const token = localStorage.getItem('filegeek-token');
+    try {
+      const endpoint = type === 'flashcards' ? '/flashcards/generate' : '/quiz/generate';
+      const res = await fetch(`${API}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ session_id: activeSessionId, topic: topic || 'the document', num_cards: 8 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Generation failed');
+      if (type === 'flashcards') {
+        setFcDialogData({ cards: data.cards, topic: data.topic });
+      } else {
+        setQuizDialogData(data.questions || data.cards || []);
+      }
+      setTopicPrompt(null);
+      setTopicInput('');
+    } catch (err) {
+      setGenError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const activeModelLabel = CHAT_MODELS.find(m => m.id === selectedModel)?.label || selectedModel.toUpperCase();
 
   const handleCopy = (id, content) => {
     navigator.clipboard.writeText(content).then(() => {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   // Auto-scroll to bottom
@@ -381,10 +414,98 @@ export default function ChatPanel() {
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, gap: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, gap: 1 }}>
+          {/* Quick-action buttons */}
+          <Box sx={{ display: 'flex', gap: 0.75 }}>
+            <Box
+              onClick={() => { setTopicPrompt('flashcards'); setTopicInput(''); setGenError(''); }}
+              sx={{
+                fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+                color: '#888', border: '1px solid #2A2A2A', px: 1.25, py: 0.4,
+                cursor: 'pointer', userSelect: 'none',
+                '&:hover': { color: '#FFAA00', borderColor: '#FFAA00' },
+              }}
+            >
+              [⚡ FLASHCARDS]
+            </Box>
+            <Box
+              onClick={() => { setTopicPrompt('quiz'); setTopicInput(''); setGenError(''); }}
+              sx={{
+                fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+                color: '#888', border: '1px solid #2A2A2A', px: 1.25, py: 0.4,
+                cursor: 'pointer', userSelect: 'none',
+                '&:hover': { color: '#00FF00', borderColor: '#00FF00' },
+              }}
+            >
+              [📝 QUIZ]
+            </Box>
+          </Box>
           <VoiceInput onTranscript={handleVoiceTranscript} />
         </Box>
       </Box>
+
+      {/* Topic prompt mini-dialog */}
+      <Dialog
+        open={Boolean(topicPrompt)}
+        onClose={() => setTopicPrompt(null)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: '#0D0D0D', border: '1px solid #333', borderRadius: 0 } }}
+      >
+        <DialogContent sx={{ p: 2 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#888', mb: 1.5 }}>
+            // Generate {topicPrompt} from this session
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            placeholder={`Topic (e.g. "memory management") — leave blank for full doc`}
+            value={topicInput}
+            onChange={e => setTopicInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleQuickGenerate(topicPrompt, topicInput); }}
+            variant="standard"
+            InputProps={{
+              disableUnderline: true,
+              sx: { fontFamily: 'monospace', fontSize: '0.85rem', color: '#E5E5E5', border: '1px solid #333', px: 1, py: 0.5 },
+            }}
+          />
+          {genError && (
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#FF4444', mt: 1 }}>{genError}</Typography>
+          )}
+          <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'flex-end' }}>
+            <Box onClick={() => setTopicPrompt(null)} sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#555', cursor: 'pointer', '&:hover': { color: '#E5E5E5' } }}>[CANCEL]</Box>
+            <Box
+              onClick={() => !generating && handleQuickGenerate(topicPrompt, topicInput)}
+              sx={{
+                fontFamily: 'monospace', fontSize: '0.7rem', fontWeight: 700,
+                color: generating ? '#444' : '#00FF00',
+                border: `1px solid ${generating ? '#333' : '#00FF00'}`,
+                px: 1.5, py: 0.25, cursor: generating ? 'default' : 'pointer',
+                '&:hover': generating ? {} : { bgcolor: '#001A00' },
+              }}
+            >
+              {generating ? '[ GENERATING... ]' : '[ GENERATE ]'}
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flashcard popup */}
+      <FlashcardPopupDialog
+        open={Boolean(fcDialogData)}
+        onClose={() => setFcDialogData(null)}
+        cards={fcDialogData?.cards || []}
+        topic={fcDialogData?.topic}
+        messageId={null}
+        sessionId={activeSessionId}
+      />
+
+      {/* Quiz popup */}
+      <QuizFlashcardDialog
+        open={Boolean(quizDialogData)}
+        onClose={() => setQuizDialogData(null)}
+        questions={quizDialogData || []}
+      />
 
       <style>{`
         @keyframes blink {
